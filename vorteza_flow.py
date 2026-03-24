@@ -25,7 +25,7 @@ def load_config():
 
 CONF = load_config()
 
-# Mapowanie modeli transportowych na kategorie kosztowe z bazy danych
+# Mapowanie modeli transportowych na kategorie kosztowe z bazy danych config.json
 VEH_MAP = {
     "TIR FTL Mega 13.6m": "FTL",
     "TIR FTL Standard 13.6m": "FTL",
@@ -138,7 +138,12 @@ def run_flow():
         add_curr = st.selectbox("WALUTA KOSZTÓW", ["PLN", "EUR"], key="add_curr")
         additional_costs = st.number_input(f"OPŁATY DODATKOWE ({add_curr})", value=0.0)
 
-    # Dane trasy z bazy config.json
+        st.divider()
+        st.markdown("### 📊 WALUTA TABELI KOSZTÓW")
+        # Nowy przełącznik dla waluty wyświetlanej w tabeli struktury kosztów
+        view_curr = st.radio("POKAZUJ KOSZTY W:", ["PLN", "EUR"], horizontal=True)
+
+    # Dane trasy pobrane z config.json
     route = CONF["DISTANCES_AND_MYTO"][origin][dest]
     dPL, dEU = route["distPL"], route["distEU"]
     total_dist = dPL + dEU
@@ -162,7 +167,7 @@ def run_flow():
     v_spec = CONF["VEHICLE_DATA"][cat]
     prices = CONF["PRICE"]
 
-    # --- OBLICZENIA (KOSZTY OPERACYJNE) ---
+    # --- OBLICZENIA (KOSZTY OPERACYJNE W PLN) ---
     # Paliwo i AdBlue w podziale na PL/EU
     cost_fuel = (dPL * v_spec["fuelUsage"] * prices["fuelPLN"]) + (dEU * v_spec["fuelUsage"] * prices["fuelEUR"] * eur_rate)
     cost_adblue = (dPL * v_spec["adBlueUsage"] * prices["adBluePLN"]) + (dEU * v_spec["adBlueUsage"] * prices["adBlueEUR"] * eur_rate)
@@ -202,24 +207,35 @@ def run_flow():
     m_clr = "v-positive" if margin_pln > 0 else "v-negative"
     c3.markdown(f'<div class="v-flow-card"><div class="v-flow-label">MARŻA (ZYSK)</div><div class="v-flow-value-main {m_clr}">{margin_pln:,.2f} PLN</div><div class="v-flow-value-sub {m_clr}">{margin_pct:.1f}% RENTOWNOŚCI</div></div>', unsafe_allow_html=True)
 
-    # --- SZCZEGÓŁOWA ANALIZA KOSZTÓW ---
+    # --- SZCZEGÓŁOWA ANALIZA KOSZTÓW Z WYBOREM WALUTY ---
     st.divider()
     ca, cb = st.columns(2)
+    
+    # Mnożnik walutowy dla tabeli
+    mult = 1.0 if view_curr == "PLN" else (1.0 / eur_rate)
+    
     with ca:
-        st.markdown("### 📊 STRUKTURA KOSZTÓW (PLN)")
-        # Tabela z wymuszonym kontrastem przez CSS
+        st.markdown(f"### 📊 STRUKTURA KOSZTÓW ({view_curr})")
+        # Przeliczanie składowych kosztów na wybraną walutę tabeli
         cost_df = pd.DataFrame({
             "SKŁADNIK": ["Paliwo", "AdBlue", "Myto (Opłaty)", "Serwis", "Kierowca", "Dodatkowe"],
-            "WARTOŚĆ": [cost_fuel, cost_adblue, cost_tolls, cost_service, cost_driver, add_costs_pln]
+            "WARTOŚĆ": [
+                cost_fuel * mult, 
+                cost_adblue * mult, 
+                cost_tolls * mult, 
+                cost_service * mult, 
+                cost_driver * mult, 
+                add_costs_pln * mult
+            ]
         })
         st.table(cost_df.set_index("SKŁADNIK"))
         
     with cb:
         st.markdown("### ⛽ ANALIZA OPERACYJNA")
-        st.info(f"**PRÓG RENTOWNOŚCI (BEP):** {total_cost_pln/total_dist:.2f} PLN/KM")
+        st.info(f"**PRÓG RENTOWNOŚCI (BEP):** {(total_cost_pln/total_dist) * mult:.2f} {view_curr}/KM")
         st.write(f"**Pojazd:** {active_veh_name} (Kategoria: {cat})")
         st.write(f"**Spalanie całkowite:** {total_dist * v_spec['fuelUsage']:.1f} L")
-        st.write(f"**Koszt na opakowanie:** {total_cost_pln/total_cases:.2f} PLN")
+        st.write(f"**Koszt na opakowanie:** {(total_cost_pln/total_cases) * mult:.2f} {view_curr}")
 
     # --- GENEROWANIE OFERTY ---
     st.divider()
