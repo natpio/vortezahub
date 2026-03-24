@@ -46,45 +46,43 @@ def inject_vorteza_stack_ui():
     st.markdown(f"""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;700&family=JetBrains+Mono&display=swap');
-            
-            /* Tło aplikacji */
             .stApp {{ 
                 background-image: url("data:image/png;base64,{bg_data}"); 
                 background-size: cover; background-attachment: fixed; 
             }}
-            
-            /* Kafelki KPI PRO */
-            .v-kpi-container {{ display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }}
             .v-kpi-card {{
                 background: rgba(10, 10, 10, 0.9);
                 border: 1px solid rgba(181, 136, 99, 0.3);
                 border-top: 4px solid #B58863;
                 padding: 12px;
-                flex: 1;
-                min-width: 150px;
                 text-align: center;
                 backdrop-filter: blur(10px);
             }}
-            .v-kpi-label {{ color: #B58863; font-size: 0.65rem; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; margin-bottom: 5px; }}
+            .v-kpi-label {{ color: #B58863; font-size: 0.65rem; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }}
             .v-kpi-value {{ color: #FFFFFF; font-size: 1.4rem; font-family: 'JetBrains Mono', monospace; font-weight: 500; }}
-            
-            /* Tabela Manifestu PRO */
             .v-table-pro {{ width: 100%; border-collapse: collapse; margin-top: 20px; background: rgba(0,0,0,0.7); border: 1px solid #333; }}
-            .v-table-pro th {{ background: #B58863; color: black; padding: 12px; text-align: left; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 1px; }}
-            .v-table-pro td {{ padding: 10px 12px; border-bottom: 1px solid #222; color: #DDD; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }}
-            
-            /* Naprawa Plotly - usunięcie białego tła */
+            .v-table-pro th {{ background: #B58863; color: black; padding: 12px; text-align: left; text-transform: uppercase; font-size: 0.7rem; }}
+            .v-table-pro td {{ padding: 10px 12px; border-bottom: 1px solid #222; color: #DDD; font-family: 'JetBrains Mono', monospace; }}
             .js-plotly-plot .plotly .main-svg {{ background: transparent !important; }}
         </style>
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. SILNIK GRAFICZNY: TRUCK PRO RENDERER
+# 2. V-COLOR ENGINE: UNIKALNE KOLORY DLA SKU
 # ==============================================================================
 def get_vorteza_sku_hex(sku_name):
+    # Szeroka paleta kolorów dla lepszej rozróżnialności produktów 
+    palette = [
+        "#B58863", "#D4AF37", "#16A085", "#27AE60", "#2980B9", 
+        "#E67E22", "#C0392B", "#8E44AD", "#F1C40F", "#34495E"
+    ]
+    # Stały kolor dla danej nazwy SKU 
     random.seed(sum(ord(c) for c in str(sku_name)))
-    return random.choice(["#B58863", "#D4AF37", "#8E6A4D", "#5E4633", "#C0392B"])
+    return random.choice(palette)
 
+# ==============================================================================
+# 3. SILNIK GRAFICZNY: TRUCK PRO RENDERER
+# ==============================================================================
 def build_mesh(vx, vy, vz, color, name, op=1.0):
     return go.Mesh3d(x=vx, y=vy, z=vz, i=[7,0,0,0,4,4,6,6,4,0,3,2], j=[3,4,1,2,5,6,5,2,0,1,6,3], k=[0,7,2,3,6,7,1,1,5,5,7,6], color=color, opacity=op, name=name, flatshading=True)
 
@@ -92,43 +90,34 @@ def render_vorteza_pro_3d(veh, stacks):
     fig = go.Figure()
     L, W, H, cab = veh['L'], veh['W'], veh['H'], veh['cab_l']
     
-    # 1. Rama i Podwozie (Miedziane akcenty)
+    # Podwozie i Koła 
     fig.add_trace(build_mesh([0, L, L, 0, 0, L, L, 0], [0, 0, W, W, 0, 0, W, W], [-10, -10, -10, -10, -2, -2, -2, -2], "#B58863", "RAMA"))
-    
-    # 2. Koła PRO z felgami
     for ax in range(veh['axles']):
         pos_x = L - 380 + (ax * 135)
         for side in [-35, W+15]:
             fig.add_trace(build_mesh([pos_x-50, pos_x+50, pos_x+50, pos_x-50, pos_x-50, pos_x+50, pos_x+50, pos_x-50], [side, side, side+20, side+20, side, side, side+20, side+20], [-80, -80, -80, -80, -5, -5, -5, -5], "#000", "KOŁO"))
-            fig.add_trace(build_mesh([pos_x-20, pos_x+20, pos_x+20, pos_x-20, pos_x-20, pos_x+20, pos_x+20, pos_x-20], [side-2, side-2, side, side, side-2, side-2, side, side], [-60, -60, -60, -60, -25, -25, -25, -25], "#B58863", "FELGA", 0.8))
-
-    # 3. Kabina PRO
+    
+    # Kabina 
     fig.add_trace(build_mesh([-cab, 0, 0, -cab, -cab, 0, 0, -cab], [-15, -15, W+15, W+15, -15, -15, W+15, W+15], [0, 0, 0, 0, H*0.95, H*0.95, H*0.95, H*0.95], "#050505", "KABINA"))
-    fig.add_trace(build_mesh([-cab+30, -10, -10, -cab+30, -cab+30, -10, -10, -cab+30], [5, 5, W-5, W-5, 5, 5, W-5, W-5], [H*0.4, H*0.4, H*0.4, H*0.4, H*0.85, H*0.85, H*0.85, H*0.85], "#1a1a1a", "SZYBA", 0.6))
-
-    # 4. Szkielet Naczepy
-    for lx, ly, lz in [([0, L], [0, 0], [0, 0]), ([0, L], [W, W], [0, 0]), ([0, 0], [0, W], [0, 0]), ([L, L], [0, W], [0, 0]), ([0, 0], [0, 0], [0, H]), ([0, 0], [W, W], [0, H]), ([0, L], [0, 0], [H, H]), ([0, L], [W, W], [H, H])]:
-        fig.add_trace(go.Scatter3d(x=lx, y=ly, z=lz, mode='lines', line=dict(color='#B58863', width=4), hoverinfo='skip'))
-
-    # 5. Ładunek
+    
+    # Ładunek z unikalnymi kolorami 
     for s in stacks:
         for u in s['items']:
             clr = get_vorteza_sku_hex(u['name'])
             vx, vy, vz = [s['x'], s['x']+u['w_fit'], s['x']+u['w_fit'], s['x'], s['x'], s['x']+u['w_fit'], s['x']+u['w_fit'], s['x']], [s['y'], s['y'], s['y']+u['l_fit'], s['y']+u['l_fit'], s['y'], s['y'], s['y']+u['l_fit'], s['y']+u['l_fit']], [u['z'], u['z'], u['z'], u['z'], u['z']+u['height'], u['z']+u['height'], u['z']+u['height'], u['z']+u['height']]
             fig.add_trace(go.Mesh3d(x=vx, y=vy, z=vz, i=[7,0,0,0,4,4,6,6,4,0,3,2], j=[3,4,1,2,5,6,5,2,0,1,6,3], k=[0,7,2,3,6,7,1,1,5,5,7,6], color=clr, opacity=0.9, name=u['name']))
             
-            # Krawędzie ładunku
+            # Krawędzie ładunku dla czytelności 
             lx = [vx[0], vx[1], vx[2], vx[3], vx[0], vx[4], vx[5], vx[1], vx[5], vx[6], vx[2], vx[6], vx[7], vx[3], vx[7], vx[4]]
             ly = [vy[0], vy[1], vy[2], vy[3], vy[0], vy[4], vy[5], vy[1], vy[5], vy[6], vy[2], vy[6], vy[7], vy[3], vy[7], vy[4]]
             lz = [vz[0], vz[1], vz[2], vz[3], vz[0], vz[4], vz[5], vz[1], vz[5], vz[6], vz[2], vz[6], vz[7], vz[3], vz[7], vz[4]]
             fig.add_trace(go.Scatter3d(x=lx, y=ly, z=lz, mode='lines', line=dict(color='black', width=2), hoverinfo='skip'))
 
-    fig.update_layout(scene=dict(aspectmode='data', xaxis_visible=False, yaxis_visible=False, zaxis_visible=False, bgcolor='rgba(0,0,0,0)'), 
-                      paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, b=0, t=0), showlegend=False)
+    fig.update_layout(scene=dict(aspectmode='data', xaxis_visible=False, yaxis_visible=False, zaxis_visible=False, bgcolor='rgba(0,0,0,0)'), paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, b=0, t=0), showlegend=False)
     return fig
 
 # ==============================================================================
-# 3. SILNIK PAKOWANIA V24 SUPREME
+# 4. SILNIK PAKOWANIA V24 SUPREME
 # ==============================================================================
 class V24SupremeEngine:
     @staticmethod
@@ -157,16 +146,16 @@ class V24SupremeEngine:
         return stacks, weight, volume, ldm_occ
 
 # ==============================================================================
-# 4. GŁÓWNA FUNKCJA URUCHOMIENIOWA (MODUŁ HUB)
+# 5. GŁÓWNA FUNKCJA URUCHOMIENIOWA
 # ==============================================================================
 def run_stack():
     inject_vorteza_stack_ui()
     L = LANGUAGES["PL"]
     if 'v_manifest' not in st.session_state: st.session_state.v_manifest = []
 
+    inventory = []
     if os.path.exists(PATH_DATA):
         with open(PATH_DATA, 'r', encoding='utf-8') as f: inventory = json.load(f)
-    else: inventory = []
 
     # --- SIDEBAR OPERACYJNY ---
     with st.sidebar:
@@ -209,7 +198,7 @@ def run_stack():
         
         stacks, weight, volume, ldm_occ = V24SupremeEngine.solve(eng_in, veh, x_shift)
         
-        # DASHBOARD KPI PRO (Sześć kolumn)
+        # DASHBOARD KPI PRO 
         c1, c2, c3, c4, c5, c6 = st.columns(6)
         stats_list = [
             (L['pcs'], sum(it['p_act'] for it in st.session_state.v_manifest)),
@@ -223,15 +212,16 @@ def run_stack():
             with [c1, c2, c3, c4, c5, c6][i]:
                 st.markdown(f'<div class="v-kpi-card"><div class="v-kpi-label">{label}</div><div class="v-kpi-value">{val}</div></div>', unsafe_allow_html=True)
 
-        # WIZUALIZACJA 3D
+        # WIZUALIZACJA 3D 
         st.plotly_chart(render_vorteza_pro_3d(veh, stacks), use_container_width=True)
         
-        # TABELA MANIFESTU PRO (SKU, OPAKOWANIA, SZTUKI)
+        # TABELA MANIFESTU PRO Z LEGENDĄ KOLORÓW 
         st.markdown(f"### 📋 {L['manifest']}")
-        html_table = f'<table class="v-table-pro"><tr><th>SKU</th><th>{L["cases"]}</th><th>{L["pcs"]}</th></tr>'
+        html_table = f'<table class="v-table-pro"><tr><th>KOLOR</th><th>SKU</th><th>{L["cases"]}</th><th>{L["pcs"]}</th></tr>'
         for it in st.session_state.v_manifest:
+            clr = get_vorteza_sku_hex(it['name'])
             cases = math.ceil(it['p_act'] / it.get('itemsPerCase', 1))
-            html_table += f'<tr><td>{it["name"]}</td><td>{cases}</td><td>{it["p_act"]}</td></tr>'
+            html_table += f'<tr><td style="text-align:center;"><span style="color:{clr}; font-size:20px;">■</span></td><td>{it["name"]}</td><td>{cases}</td><td>{it["p_act"]}</td></tr>'
         st.markdown(html_table + '</table>', unsafe_allow_html=True)
     else:
         st.info(L['no_data'])
