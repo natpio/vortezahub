@@ -30,11 +30,12 @@ LANGUAGES = {
         "save_db": "ZAPISZ BAZĘ SKU", "sync": "SYNCHRONIZACJA OK", "update": "AKTUALIZUJ MANIFEST",
         "sku_ident": "IDENTYFIKATOR SKU", "mode_sel": "TRYB PRACY", 
         "mode_3d": "🛰️ WIZUALIZACJA 3D", "mode_db": "📦 EDYTOR BAZY SKU",
-        "fleet_needed": "WYMAGANA FLOTA", "vehicle_num": "POJAZD #"
+        "fleet_needed": "WYMAGANA FLOTA", "vehicle_num": "POJAZD #",
+        "select_veh": "WYBIERZ POJAZD DO PODGLĄDU:"
     }
 }
 
-# REJESTR POJAZDÓW (Uporządkowany od najmniejszego do największego dla optymalizatora) [cite: 11, 12]
+# REJESTR POJAZDÓW (Uporządkowany od najmniejszego do największego)
 FLEET_MASTER_DATA = {
     "BUS Opel Movano": {"max_w": 1300, "L": 420, "W": 210, "H": 230, "axles": 2, "cab_l": 150, "total_ldm": 4.2},
     "Solo 6m Light": {"max_w": 5000, "L": 610, "W": 245, "H": 250, "axles": 2, "cab_l": 180, "total_ldm": 6.1},
@@ -45,7 +46,7 @@ FLEET_MASTER_DATA = {
 }
 
 # ==============================================================================
-# 1. UI ENGINE: APEX DARK & TRANSPARENCY [cite: 13, 14, 15, 16, 17]
+# 1. UI ENGINE: APEX DARK & COLOR FIX
 # ==============================================================================
 def inject_vorteza_stack_ui():
     bg_data = ""
@@ -59,12 +60,29 @@ def inject_vorteza_stack_ui():
                 background-image: url("data:image/png;base64,{bg_data}"); 
                 background-size: cover; background-attachment: fixed; 
             }}
+            
+            /* NAPRAWA CZYTELNOŚCI - MIEDZIANE CZCIONKI DLA WIDGETÓW */
+            div[data-testid="stWidgetLabel"] p {{
+                color: #B58863 !important;
+                font-weight: 700 !important;
+                letter-spacing: 1px;
+            }}
+            div[data-testid="stRadio"] label p {{
+                color: #B58863 !important;
+                font-size: 1rem !important;
+            }}
+            .stSlider [data-testid="stWidgetLabel"] p {{
+                color: #B58863 !important;
+            }}
+            
+            /* Kafelki KPI PRO */
             .v-kpi-card {{
                 background: rgba(10, 10, 10, 0.9); border: 1px solid rgba(181, 136, 99, 0.3);
                 border-top: 4px solid #B58863; padding: 12px; text-align: center; backdrop-filter: blur(10px);
             }}
             .v-kpi-label {{ color: #B58863; font-size: 0.65rem; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }}
             .v-kpi-value {{ color: #FFFFFF; font-size: 1.4rem; font-family: 'JetBrains Mono', monospace; font-weight: 500; }}
+            
             .v-table-pro {{ width: 100%; border-collapse: collapse; margin-top: 20px; background: rgba(0,0,0,0.7); border: 1px solid #333; }}
             .v-table-pro th {{ background: #B58863; color: black; padding: 12px; text-align: left; text-transform: uppercase; font-size: 0.7rem; }}
             .v-table-pro td {{ padding: 10px 12px; border-bottom: 1px solid #222; color: #DDD; font-family: 'JetBrains Mono', monospace; }}
@@ -74,7 +92,7 @@ def inject_vorteza_stack_ui():
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. V-COLOR ENGINE [cite: 34]
+# 2. V-COLOR ENGINE
 # ==============================================================================
 def get_vorteza_sku_hex(sku_name):
     palette = ["#B58863", "#D4AF37", "#16A085", "#27AE60", "#2980B9", "#E67E22", "#C0392B", "#8E44AD", "#F1C40F", "#34495E"]
@@ -82,7 +100,7 @@ def get_vorteza_sku_hex(sku_name):
     return random.choice(palette)
 
 # ==============================================================================
-# 3. SILNIK GRAFICZNY: TRUCK PRO RENDERER (V26 FULL CONTOUR) [cite: 35, 36, 37, 38, 39]
+# 3. SILNIK GRAFICZNY PRO (V26)
 # ==============================================================================
 def build_mesh(vx, vy, vz, color, name, op=1.0):
     return go.Mesh3d(x=vx, y=vy, z=vz, i=[7,0,0,0,4,4,6,6,4,0,3,2], j=[3,4,1,2,5,6,5,2,0,1,6,3], k=[0,7,2,3,6,7,1,1,5,5,7,6], color=color, opacity=op, name=name, flatshading=True)
@@ -101,7 +119,7 @@ def render_vorteza_pro_3d(veh, stacks):
     # Kabina
     fig.add_trace(build_mesh([-cab, 0, 0, -cab, -cab, 0, 0, -cab], [-15, -15, W+15, W+15, -15, -15, W+15, W+15], [0, 0, 0, 0, H*0.95, H*0.95, H*0.95, H*0.95], "#050505", "KABINA"))
     
-    # Pełny szkielet naczepy (Klatka wizualna) [cite: 38]
+    # Kontury Naczepy
     skel_lines = [
         ([0, L], [0, 0], [0, 0]), ([0, L], [W, W], [0, 0]), ([0, 0], [0, W], [0, 0]), ([L, L], [0, W], [0, 0]),
         ([0, L], [0, 0], [H, H]), ([0, L], [W, W], [H, H]), ([0, 0], [0, W], [H, H]), ([L, L], [0, W], [H, H]),
@@ -110,7 +128,7 @@ def render_vorteza_pro_3d(veh, stacks):
     for lx, ly, lz in skel_lines:
         fig.add_trace(go.Scatter3d(x=lx, y=ly, z=lz, mode='lines', line=dict(color='#B58863', width=5), hoverinfo='skip'))
     
-    # Ładunek (Solid Mesh, Opacity 1.0) [cite: 39]
+    # Ładunek Solidny
     for s in stacks:
         for u in s['items']:
             clr = get_vorteza_sku_hex(u['name'])
@@ -126,7 +144,7 @@ def render_vorteza_pro_3d(veh, stacks):
     return fig
 
 # ==============================================================================
-# 4. SILNIK DYNAMICZNEJ FLOTY V26 (AUTO-OPTIMIZER) [cite: 40, 50]
+# 4. SILNIK DYNAMICZNEJ FLOTY V26 (DYNAMIC-FLEET OPTIMIZER)
 # ==============================================================================
 class V26FleetOptimizer:
     @staticmethod
@@ -135,14 +153,12 @@ class V26FleetOptimizer:
         for i, u in enumerate(cargo):
             if weight + u['weight'] > veh['max_w']: continue
             placed = False
-            # 1. Próba piętrowania (Mieszanie SKU dozwolone) [cite: 41, 42, 43, 44]
             for s in stacks:
                 if u.get('canStack', True) and u['width'] <= s['w'] and u['length'] <= s['l'] and (s['curH'] + u['height'] <= veh['H']):
                     u_c = u.copy(); u_c['z'], u_c['w_fit'], u_c['l_fit'] = s['curH'], s['w'], s['l']
                     s['items'].append(u_c); s['curH'] += u['height']; weight += u['weight']
                     volume += (u['width']*u['length']*u['height'])/1e6; packed_indices.append(i); placed = True; break
             if placed: continue
-            # 2. Skanowanie podłogi (First-Fit X-Y) [cite: 45, 46, 47, 48, 49]
             for x in range(x_off, veh['L'] - u['width'] + 1, 10):
                 for y in range(0, veh['W'] - u['length'] + 1, 10):
                     collision = False
@@ -160,31 +176,23 @@ class V26FleetOptimizer:
     def solve_multi(cargo_full, x_off=0):
         cargo_working = sorted(cargo_full, key=lambda x: (not x.get('canStack', True), x['width']*x['length']*x['height']), reverse=True)
         fleet_results = []
-        
         while cargo_working:
             best_veh_name, best_result = None, None
-            # Próba dopasowania do najmniejszego możliwego pojazdu
             for v_name, v_spec in FLEET_MASTER_DATA.items():
                 stacks, weight, vol, indices = V26FleetOptimizer.pack_single(cargo_working, v_spec, x_off)
-                if len(indices) == len(cargo_working): # Wszystko weszło w ten pojazd
+                if len(indices) == len(cargo_working):
                     best_veh_name, best_result = v_name, (stacks, weight, vol, indices)
                     break
-                if v_name == list(FLEET_MASTER_DATA.keys())[-1]: # Największy dostępny pojazd
+                if v_name == list(FLEET_MASTER_DATA.keys())[-1]:
                     best_veh_name, best_result = v_name, (stacks, weight, vol, indices)
-            
             if not best_result or not best_result[3]: break
-            
             stacks, weight, vol, indices = best_result
-            fleet_results.append({
-                "v_name": best_veh_name, "v_spec": FLEET_MASTER_DATA[best_veh_name],
-                "stacks": stacks, "weight": weight, "volume": vol,
-                "packed_items": [cargo_working[i] for i in indices]
-            })
+            fleet_results.append({"v_name": best_veh_name, "v_spec": FLEET_MASTER_DATA[best_veh_name], "stacks": stacks, "weight": weight, "volume": vol, "packed_items": [cargo_working[i] for i in indices]})
             cargo_working = [item for i, item in enumerate(cargo_working) if i not in indices]
         return fleet_results
 
 # ==============================================================================
-# 5. GŁÓWNA FUNKCJA URUCHOMIENIOWA (INTEGRACJA Z HUB)
+# 5. GŁÓWNA FUNKCJA URUCHOMIENIOWA
 # ==============================================================================
 def db_core_load():
     if os.path.exists(PATH_DATA):
@@ -216,9 +224,7 @@ def run_stack():
             sel_sku = st.selectbox(L['sku_sel'], [p['name'] for p in inventory], index=None)
             if sel_sku:
                 p_ref = next(p for p in inventory if p['name'] == sel_sku)
-                # Fix dla itemsPerCase
-                base_ipc = p_ref.get('itemsPerCase')
-                ipc = int(base_ipc) if base_ipc and str(base_ipc).isdigit() else 1
+                ipc = int(p_ref.get('itemsPerCase', 1)) if p_ref.get('itemsPerCase') else 1
                 p_qty = st.number_input(L['qty'], min_value=1, value=ipc)
                 if st.button(L['add']):
                     found = False
@@ -247,18 +253,17 @@ def run_stack():
                 safe_ipc = int(e.get('itemsPerCase', 1)) if e.get('itemsPerCase') else 1
                 for _ in range(math.ceil(e['p_act'] / safe_ipc)): full_cargo_list.append(e.copy())
             
-            # WYWOŁANIE OPTYMALIZATORA FLOTY V26
             planned_fleet = V26FleetOptimizer.solve_multi(full_cargo_list, x_shift)
             st.markdown(f"### 🚛 {L['fleet_needed']}: {len(planned_fleet)}")
             
             veh_idx = 0
             if len(planned_fleet) > 1:
-                veh_idx = st.radio("WYBIERZ POJAZD:", range(len(planned_fleet)), format_func=lambda x: f"{L['vehicle_num']}{x+1} - {planned_fleet[x]['v_name']}", horizontal=True)
+                # MIEDZIANY RADIO BUTTON DLA WYBORU POJAZDU
+                veh_idx = st.radio(L['select_veh'], range(len(planned_fleet)), format_func=lambda x: f"{L['vehicle_num']}{x+1} - {planned_fleet[x]['v_name']}", horizontal=True)
             
             active_veh = planned_fleet[veh_idx]
             ldm_occ = (max([s['x'] + s['w'] for s in active_veh['stacks']]) / 100) if active_veh['stacks'] else 0
             
-            # Dashboard KPI [cite: 67]
             c1, c2, c3, c4, c5 = st.columns(5)
             stats = [(L['pcs'], len(active_veh['packed_items'])), (L['weight'], f"{active_veh['weight']} KG"), (L['vol'], f"{active_veh['volume']:.1f} m³"), (L['ldm_occ'], f"{ldm_occ:.2f}"), (L['util'], f"{(active_veh['weight']/active_veh['v_spec']['max_w'])*100:.1f}%")]
             for i, (label, val) in enumerate(stats):
@@ -266,7 +271,6 @@ def run_stack():
 
             st.plotly_chart(render_vorteza_pro_3d(active_veh['v_spec'], active_veh['stacks']), use_container_width=True)
             
-            # Tabela aktywnego pojazdu [cite: 68]
             st.markdown(f"### 📋 {L['manifest']} - {active_veh['v_name']}")
             sku_counts = pd.Series([it['name'] for it in active_veh['packed_items']]).value_counts().reset_index()
             sku_counts.columns = ['SKU', 'OPAKOWANIA']
@@ -275,10 +279,9 @@ def run_stack():
                 clr = get_vorteza_sku_hex(row['SKU'])
                 html_table += f'<tr><td style="text-align:center;"><span style="color:{clr}; font-size:20px;">■</span></td><td>{row["SKU"]}</td><td>{row["OPAKOWANIA"]}</td></tr>'
             st.markdown(html_table + '</table>', unsafe_allow_html=True)
-        else:
-            st.info(L['no_data'])
+        else: st.info(L['no_data'])
 
-    elif app_mode == L['mode_db']: # [cite: 69, 70]
+    elif app_mode == L['mode_db']:
         st.markdown(f"### 📦 {L['inventory']}")
         new_db = st.data_editor(pd.DataFrame(inventory), use_container_width=True, num_rows="dynamic", key="db_edit")
         if st.button(L['save_db']):
