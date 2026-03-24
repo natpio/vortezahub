@@ -39,7 +39,7 @@ FLEET_MASTER_DATA = {
 }
 
 # ==============================================================================
-# 1. UI ENGINE
+# 1. UI ENGINE: APEX DARK & TRANSPARENCY
 # ==============================================================================
 def inject_vorteza_stack_ui():
     bg_data = ""
@@ -49,8 +49,18 @@ def inject_vorteza_stack_ui():
     st.markdown(f"""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;700&family=JetBrains+Mono&display=swap');
-            .stApp {{ background-image: url("data:image/png;base64,{bg_data}"); background-size: cover; background-attachment: fixed; }}
-            .v-kpi-card {{ background: rgba(10, 10, 10, 0.9); border: 1px solid rgba(181, 136, 99, 0.3); border-top: 4px solid #B58863; padding: 12px; text-align: center; backdrop-filter: blur(10px); }}
+            .stApp {{ 
+                background-image: url("data:image/png;base64,{bg_data}"); 
+                background-size: cover; background-attachment: fixed; 
+            }}
+            .v-kpi-card {{
+                background: rgba(10, 10, 10, 0.9);
+                border: 1px solid rgba(181, 136, 99, 0.3);
+                border-top: 4px solid #B58863;
+                padding: 12px;
+                text-align: center;
+                backdrop-filter: blur(10px);
+            }}
             .v-kpi-label {{ color: #B58863; font-size: 0.65rem; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }}
             .v-kpi-value {{ color: #FFFFFF; font-size: 1.4rem; font-family: 'JetBrains Mono', monospace; font-weight: 500; }}
             .v-table-pro {{ width: 100%; border-collapse: collapse; margin-top: 20px; background: rgba(0,0,0,0.7); border: 1px solid #333; }}
@@ -69,7 +79,7 @@ def get_vorteza_sku_hex(sku_name):
     return random.choice(palette)
 
 # ==============================================================================
-# 3. SILNIK GRAFICZNY I PAKOWANIA
+# 3. SILNIK GRAFICZNY: TRUCK PRO RENDERER
 # ==============================================================================
 def build_mesh(vx, vy, vz, color, name, op=1.0):
     return go.Mesh3d(x=vx, y=vy, z=vz, i=[7,0,0,0,4,4,6,6,4,0,3,2], j=[3,4,1,2,5,6,5,2,0,1,6,3], k=[0,7,2,3,6,7,1,1,5,5,7,6], color=color, opacity=op, name=name, flatshading=True)
@@ -77,18 +87,27 @@ def build_mesh(vx, vy, vz, color, name, op=1.0):
 def render_vorteza_pro_3d(veh, stacks):
     fig = go.Figure()
     L, W, H, cab = veh['L'], veh['W'], veh['H'], veh['cab_l']
+    
+    # Podwozie i Koła
     fig.add_trace(build_mesh([0, L, L, 0, 0, L, L, 0], [0, 0, W, W, 0, 0, W, W], [-10, -10, -10, -10, -2, -2, -2, -2], "#B58863", "RAMA"))
     for ax in range(veh['axles']):
         pos_x = L - 380 + (ax * 135)
         for side in [-35, W+15]:
             fig.add_trace(build_mesh([pos_x-50, pos_x+50, pos_x+50, pos_x-50, pos_x-50, pos_x+50, pos_x+50, pos_x-50], [side, side, side+20, side+20, side, side, side+20, side+20], [-80, -80, -80, -80, -5, -5, -5, -5], "#000", "KOŁO"))
+    
+    # Kabina
     fig.add_trace(build_mesh([-cab, 0, 0, -cab, -cab, 0, 0, -cab], [-15, -15, W+15, W+15, -15, -15, W+15, W+15], [0, 0, 0, 0, H*0.95, H*0.95, H*0.95, H*0.95], "#050505", "KABINA"))
     
-    # Pełne kontury naczepy
-    skel_lines = [([0, L], [0, 0], [0, 0]), ([0, L], [W, W], [0, 0]), ([0, 0], [0, W], [0, 0]), ([L, L], [0, W], [0, 0]), ([0, L], [0, 0], [H, H]), ([0, L], [W, W], [H, H]), ([0, 0], [0, W], [H, H]), ([L, L], [0, W], [H, H]), ([0, 0], [0, 0], [0, H]), ([0, 0], [W, W], [0, H]), ([L, L], [0, 0], [0, H]), ([L, L], [W, W], [0, H])]
+    # Pełny szkielet naczepy (Sufit i Ściany)
+    skel_lines = [
+        ([0, L], [0, 0], [0, 0]), ([0, L], [W, W], [0, 0]), ([0, 0], [0, W], [0, 0]), ([L, L], [0, W], [0, 0]),
+        ([0, L], [0, 0], [H, H]), ([0, L], [W, W], [H, H]), ([0, 0], [0, W], [H, H]), ([L, L], [0, W], [H, H]),
+        ([0, 0], [0, 0], [0, H]), ([0, 0], [W, W], [0, H]), ([L, L], [0, 0], [0, H]), ([L, L], [W, W], [0, H])
+    ]
     for lx, ly, lz in skel_lines:
         fig.add_trace(go.Scatter3d(x=lx, y=ly, z=lz, mode='lines', line=dict(color='#B58863', width=5), hoverinfo='skip'))
     
+    # Ładunek solidny
     for s in stacks:
         for u in s['items']:
             clr = get_vorteza_sku_hex(u['name'])
@@ -103,36 +122,50 @@ def render_vorteza_pro_3d(veh, stacks):
     fig.update_layout(scene=dict(aspectmode='data', xaxis_visible=False, yaxis_visible=False, zaxis_visible=False, bgcolor='rgba(0,0,0,0)'), paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, b=0, t=0), showlegend=False)
     return fig
 
+# ==============================================================================
+# 4. SILNIK OPTYMALIZACJI PRZESTRZENNEJ V25 (SPACE-MAXIMIZER)
+# ==============================================================================
 class V25SpaceMaximizer:
     @staticmethod
     def solve(cargo, veh, x_off=0):
         items = sorted(cargo, key=lambda x: (not x.get('canStack', True), x['width'] * x['length'] * x['height']), reverse=True)
         stacks, weight, volume = [], 0, 0
+        
         for u in items:
             if weight + u['weight'] > veh['max_w']: continue
+            
             placed = False
+            # 1. Piętrowanie (mieszanie produktów dozwolone)
             for s in stacks:
                 if u.get('canStack', True) and u['width'] <= s['w'] and u['length'] <= s['l']:
                     if (s['curH'] + u['height'] <= veh['H']):
                         u_c = u.copy(); u_c['z'], u_c['w_fit'], u_c['l_fit'] = s['curH'], s['w'], s['l']
-                        s['items'].append(u_c); s['curH'] += u['height']; weight += u['weight']; volume += (u['width']*u['length']*u['height'])/1e6; placed = True; break
+                        s['items'].append(u_c); s['curH'] += u['height']
+                        weight += u['weight']; volume += (u['width']*u['length']*u['height'])/1e6
+                        placed = True; break
             if placed: continue
+            
+            # 2. Skanowanie podłogi (First-Fit)
             for x in range(x_off, veh['L'] - u['width'], 10):
                 for y in range(0, veh['W'] - u['length'], 10):
                     collision = False
                     for s in stacks:
-                        if not (x + u['width'] <= s['x'] or x >= s['x'] + s['w'] or y + u['length'] <= s['y'] or y >= s['y'] + s['l']):
+                        if not (x + u['width'] <= s['x'] or x >= s['x'] + s['w'] or 
+                                y + u['length'] <= s['y'] or y >= s['y'] + s['l']):
                             collision = True; break
+                    
                     if not collision:
                         u_c = u.copy(); u_c['z'], u_c['w_fit'], u_c['l_fit'] = 0, u['width'], u['length']
                         stacks.append({'x':x, 'y':y, 'w':u['width'], 'l':u['length'], 'curH':u['height'], 'items':[u_c]})
-                        weight += u['weight']; volume += (u['width']*u['length']*u['height'])/1e6; placed = True; break
+                        weight += u['weight']; volume += (u['width']*u['length']*u['height'])/1e6
+                        placed = True; break
                 if placed: break
+        
         ldm_occ = (max([s['x'] + s['w'] for s in stacks]) / 100) if stacks else 0
         return stacks, weight, volume, ldm_occ
 
 # ==============================================================================
-# 4. GŁÓWNA FUNKCJA URUCHOMIENIOWA
+# 5. GŁÓWNA FUNKCJA URUCHOMIENIOWA (INTEGRACJA Z HUB)
 # ==============================================================================
 def db_core_load():
     if os.path.exists(PATH_DATA):
@@ -151,6 +184,7 @@ def run_stack():
     if 'v_manifest' not in st.session_state: st.session_state.v_manifest = []
     inventory = db_core_load()
 
+    # --- SIDEBAR: TRYB PRACY I PARAMETRY ---
     with st.sidebar:
         st.markdown(f"### ⚙️ {L['mode_sel']}")
         app_mode = st.radio("WYBÓR PANELU", [L['mode_3d'], L['mode_db']], label_visibility="collapsed")
@@ -167,7 +201,7 @@ def run_stack():
             sel_sku = st.selectbox(L['sku_sel'], [p['name'] for p in inventory], index=None)
             if sel_sku:
                 p_ref = next(p for p in inventory if p['name'] == sel_sku)
-                # FIX DLA TypeError: itemsPerCase może być None
+                # Zabezpieczenie przed TypeError dla nowo dodanych SKU
                 base_ipc = p_ref.get('itemsPerCase')
                 ipc = int(base_ipc) if base_ipc and str(base_ipc).isdigit() else 1
                 
@@ -187,36 +221,62 @@ def run_stack():
                 df_m = pd.DataFrame(st.session_state.v_manifest)
                 res_edit = st.data_editor(df_m[['name', 'p_act']], column_config={"p_act": st.column_config.NumberColumn(L['qty'], min_value=0)}, use_container_width=True, key="manifest_editor")
                 if st.button(L['update']):
+                    # Filtracja: usuwanie produktów przy ilości 0
                     new_m = []
                     for _, row in res_edit.iterrows():
                         if row['p_act'] > 0:
                             orig = next((p for p in inventory if p['name'] == row['name']), None)
                             if orig:
-                                u_entry = orig.copy(); u_entry['p_act'] = row['p_act']; new_m.append(u_entry)
+                                u_entry = orig.copy(); u_entry['p_act'] = row['p_act']
+                                new_m.append(u_entry)
                     st.session_state.v_manifest = new_m
                     st.rerun()
             if st.button(L['purge']): st.session_state.v_manifest = []; st.rerun()
 
+    # --- ROUTING TRYBÓW GŁÓWNYCH ---
     st.markdown(f"<h2 style='color:#B58863; letter-spacing:10px;'>{L['title']}</h2>", unsafe_allow_html=True)
 
     if app_mode == L['mode_3d']:
         if st.session_state.v_manifest:
             eng_in = []
             for e in st.session_state.v_manifest:
-                # FIX: Zabezpieczenie przed dzieleniem przez zero lub None
+                # Zabezpieczenie przed dzieleniem przez zero przy pustych danych
                 ipc_val = e.get('itemsPerCase')
                 safe_ipc = int(ipc_val) if ipc_val and str(ipc_val).isdigit() and int(ipc_val) > 0 else 1
                 n_cases = math.ceil(e['p_act'] / safe_ipc)
                 for _ in range(n_cases): eng_in.append(e.copy())
             
             stacks, weight, volume, ldm_occ = V25SpaceMaximizer.solve(eng_in, veh, x_shift)
+            
+            # Dashboard KPI
             c1, c2, c3, c4, c5, c6 = st.columns(6)
-            stats_list = [(L['pcs'], sum(it['p_act'] for it in st.session_state.v_manifest)), (L['weight'], f"{weight} KG"), (L['vol'], f"{volume:.1f} m³"), (L['ldm_occ'], f"{ldm_occ:.2f}"), (L['ldm_free'], f"{veh['total_ldm'] - ldm_occ:.2f}"), (L['util'], f"{(weight/veh['max_w'])*100:.1f}%")]
+            stats_list = [
+                (L['pcs'], sum(it['p_act'] for it in st.session_state.v_manifest)),
+                (L['weight'], f"{weight} KG"),
+                (L['vol'], f"{volume:.1f} m³"),
+                (L['ldm_occ'], f"{ldm_occ:.2f}"),
+                (L['ldm_free'], f"{veh['total_ldm'] - ldm_occ:.2f}"),
+                (L['util'], f"{(weight/veh['max_w'])*100:.1f}%")
+            ]
             for i, (label, val) in enumerate(stats_list):
                 with [c1, c2, c3, c4, c5, c6][i]:
                     st.markdown(f'<div class="v-kpi-card"><div class="v-kpi-label">{label}</div><div class="v-kpi-value">{val}</div></div>', unsafe_allow_html=True)
+
             st.plotly_chart(render_vorteza_pro_3d(veh, stacks), use_container_width=True)
-        else: st.info(L['no_data'])
+            
+            # Tabela Manifestu PRO
+            st.markdown(f"### 📋 {L['manifest']}")
+            html_table = f'<table class="v-table-pro"><tr><th>KOLOR</th><th>SKU</th><th>{L["cases"]}</th><th>{L["pcs"]}</th></tr>'
+            for it in st.session_state.v_manifest:
+                clr = get_vorteza_sku_hex(it['name'])
+                # Wyświetlamy realną liczbę opakowań (cases)
+                ipc_val = it.get('itemsPerCase')
+                safe_ipc = int(ipc_val) if ipc_val and str(ipc_val).isdigit() and int(ipc_val) > 0 else 1
+                cases = math.ceil(it['p_act'] / safe_ipc)
+                html_table += f'<tr><td style="text-align:center;"><span style="color:{clr}; font-size:20px;">■</span></td><td>{it["name"]}</td><td>{cases}</td><td>{it["p_act"]}</td></tr>'
+            st.markdown(html_table + '</table>', unsafe_allow_html=True)
+        else:
+            st.info(L['no_data'])
 
     elif app_mode == L['mode_db']:
         st.markdown(f"### 📦 {L['inventory']}")
