@@ -98,7 +98,7 @@ def inject_vorteza_flow_ui():
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. SILNIK OBLICZENIOWY FLOW
+# 2. SILNIK OBLICZENIOWY FLOW v1.9
 # ==============================================================================
 def run_flow():
     inject_vorteza_flow_ui()
@@ -140,7 +140,6 @@ def run_flow():
 
         st.divider()
         st.markdown("### 📊 WALUTA TABELI KOSZTÓW")
-        # Nowy przełącznik dla waluty wyświetlanej w tabeli struktury kosztów
         view_curr = st.radio("POKAZUJ KOSZTY W:", ["PLN", "EUR"], horizontal=True)
 
     # Dane trasy pobrane z config.json
@@ -153,14 +152,11 @@ def run_flow():
         if 'v_manifest' not in st.session_state or not st.session_state.v_manifest:
             st.warning("⚠️ BRAK DANYCH W STACK. NAJPIERW DODAJ TOWAR DO PLANERA 3D."); return
         total_cases = sum(math.ceil(it['p_act'] / it.get('itemsPerCase', 1)) for it in st.session_state.v_manifest)
-        total_weight = sum(it.get('weight', 0) * math.ceil(it['p_act'] / it.get('itemsPerCase', 1)) for it in st.session_state.v_manifest)
-        st.markdown(f"<div class='v-badge-unit'>POBRANO ZE STACK: {total_cases} OPAKOWAŃ | {total_weight} KG</div>", unsafe_allow_html=True)
         active_veh_name = st.selectbox("POJAZD DO ANALIZY", list(VEH_MAP.keys()))
     else:
         col1, col2 = st.columns(2)
         with col1: active_veh_name = st.selectbox("TYP POJAZDU", list(VEH_MAP.keys()))
         with col2: total_cases = st.number_input("OPAKOWANIA", min_value=1, value=12)
-        total_weight = total_cases * 450
 
     # Parametry techniczne i kosztowe pojazdu z bazy danych
     cat = VEH_MAP[active_veh_name]
@@ -175,15 +171,16 @@ def run_flow():
     # Serwis i Amortyzacja
     cost_service = (dPL * v_spec["serviceCostPLN"]) + (dEU * v_spec["serviceCostEUR"] * eur_rate)
     
-    # Myto (dynamicznie pobierane z bazy dla trasy i kategorii pojazdu)
+    # MYTO FIX: Pobieramy z bazy (EUR) i przeliczamy na PLN dla sumy całkowitej
     myto_key = f"myto{cat}"
-    cost_tolls = route.get(myto_key, 0)
+    cost_tolls_eur = route.get(myto_key, 0)
+    cost_tolls_pln = cost_tolls_eur * eur_rate
     
     # Przeliczenie kosztów dodatkowych na PLN
     add_costs_pln = additional_costs if add_curr == "PLN" else (additional_costs * eur_rate)
     
     cost_driver = 500 + (total_dist * 0.15)
-    total_cost_pln = cost_fuel + cost_adblue + cost_service + cost_tolls + cost_driver + add_costs_pln
+    total_cost_pln = cost_fuel + cost_adblue + cost_service + cost_tolls_pln + cost_driver + add_costs_pln
 
     # --- LOGIKA PRZYCHODU I MARŻY ---
     raw_revenue = 0
@@ -211,7 +208,7 @@ def run_flow():
     st.divider()
     ca, cb = st.columns(2)
     
-    # Mnożnik walutowy dla tabeli
+    # Mnożnik walutowy dla tabeli widoku
     mult = 1.0 if view_curr == "PLN" else (1.0 / eur_rate)
     
     with ca:
@@ -222,7 +219,7 @@ def run_flow():
             "WARTOŚĆ": [
                 cost_fuel * mult, 
                 cost_adblue * mult, 
-                cost_tolls * mult, 
+                cost_tolls_pln * mult, 
                 cost_service * mult, 
                 cost_driver * mult, 
                 add_costs_pln * mult
