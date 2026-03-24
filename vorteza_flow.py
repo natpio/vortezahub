@@ -6,29 +6,36 @@ import json
 import math
 
 # ==============================================================================
-# 0. KONFIGURACJA I MASTER DATA
+# 0. ŁADOWANIE KONFIGURACJI BIZNESOWEJ
 # ==============================================================================
-PATH_BG = os.path.join("assets", "bg_vorteza.png")
+def load_config():
+    """Wczytuje parametry kosztowe, trasy i stawki myta z bazy danych."""
+    try:
+        with open("config.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        st.error("BŁĄD: Brak pliku config.json w katalogu głównym.")
+        return {}
 
-FLEET_MASTER_DATA = {
-    "BUS Opel Movano": {"max_w": 1300, "L": 420, "W": 210, "H": 230, "axles": 2, "total_ldm": 4.2, "cons": 11.5},
-    "Solo 6m Light": {"max_w": 5000, "L": 610, "W": 245, "H": 250, "axles": 2, "total_ldm": 6.1, "cons": 19.0},
-    "Solo 7m Medium": {"max_w": 7000, "L": 720, "W": 245, "H": 260, "axles": 2, "total_ldm": 7.2, "cons": 21.0},
-    "Solo 9m Heavy Duty": {"max_w": 9500, "L": 920, "W": 245, "H": 270, "axles": 2, "total_ldm": 9.2, "cons": 23.5},
-    "TIR FTL Standard 13.6m": {"max_w": 24000, "L": 1360, "W": 248, "H": 275, "axles": 3, "total_ldm": 13.6, "cons": 28.5},
-    "TIR FTL Mega 13.6m": {"max_w": 24000, "L": 1360, "W": 248, "H": 300, "axles": 3, "total_ldm": 13.6, "cons": 30.0}
+CONF = load_config()
+
+# Mapowanie modeli transportowych na kategorie kosztowe z bazy danych
+VEH_MAP = {
+    "TIR FTL Mega 13.6m": "FTL",
+    "TIR FTL Standard 13.6m": "FTL",
+    "Solo 9m Heavy Duty": "Solo",
+    "Solo 7m Medium": "Solo",
+    "Solo 6m Light": "Solo",
+    "BUS Opel Movano": "Bus"
 }
 
 def inject_vorteza_flow_ui():
+    """Wstrzykuje stylizację APEX PRO dla modułu finansowego."""
     st.markdown(f"""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;700&family=JetBrains+Mono&display=swap');
             
-            .stApp {{ 
-                background-image: url("data:image/png;base64,{os.path.exists(PATH_BG)}"); 
-                background-size: cover; background-attachment: fixed; 
-            }}
-            
+            /* Kafelki Finansowe Dual-Currency */
             .v-flow-card {{
                 background: rgba(10, 10, 10, 0.9);
                 border: 1px solid rgba(181, 136, 99, 0.3);
@@ -39,139 +46,156 @@ def inject_vorteza_flow_ui():
                 margin-bottom: 15px;
             }}
             .v-flow-label {{ color: #B58863; font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; }}
-            .v-flow-value-main {{ color: #FFFFFF; font-size: 1.6rem; font-family: 'JetBrains Mono', monospace; font-weight: 500; }}
-            .v-flow-value-sub {{ color: #B58863; font-size: 1.1rem; font-family: 'JetBrains Mono', monospace; margin-top: 4px; border-top: 1px solid rgba(181,136,99,0.2); padding-top: 4px; }}
+            .v-flow-value-main {{ color: #FFFFFF; font-size: 1.7rem; font-family: 'JetBrains Mono', monospace; font-weight: 500; }}
+            .v-flow-value-sub {{ color: #B58863; font-size: 1.1rem; font-family: 'JetBrains Mono', monospace; margin-top: 5px; border-top: 1px solid rgba(181,136,99,0.2); padding-top: 5px; }}
             
             .v-positive {{ color: #00FF41 !important; }}
             .v-negative {{ color: #FF3131 !important; }}
             
-            div[data-testid="stWidgetLabel"] p {{ color: #B58863 !important; font-weight: 700 !important; }}
+            /* Nagłówki Widgetów */
+            div[data-testid="stWidgetLabel"] p {{ color: #B58863 !important; font-weight: 700 !important; letter-spacing: 1px; }}
             div[data-testid="stRadio"] label p {{ color: #B58863 !important; }}
         </style>
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 1. SILNIK FLOW
+# 1. SILNIK OBLICZENIOWY FLOW
 # ==============================================================================
 def run_flow():
     inject_vorteza_flow_ui()
     st.markdown(f"<h2 style='color:#B58863; letter-spacing:10px;'>VORTEZA FLOW</h2>", unsafe_allow_html=True)
 
-    # --- SIDEBAR: KONFIGURACJA ---
+    if not CONF: return
+
+    # --- SIDEBAR: KONFIGURACJA TRASY I STAWEK ---
     with st.sidebar:
         st.markdown("### 🛠️ TRYB OBLICZEŃ")
         source_mode = st.radio("ŹRÓDŁO DANYCH", ["🔗 SYNC (ZE STACK)", "⚡ MANUAL (SZYBKI)"], label_visibility="collapsed")
         
         st.divider()
-        st.markdown("### 💶 WALUTA")
-        eur_rate = st.number_input("KURS EUR/PLN", min_value=1.0, value=4.35, step=0.01)
+        st.markdown("### 🗺️ WYBÓR TRASY")
+        origin = st.selectbox("PUNKT STARTU", list(CONF["DISTANCES_AND_MYTO"].keys()))
+        dest = st.selectbox("PUNKT DOCELOWY", list(CONF["DISTANCES_AND_MYTO"][origin].keys()))
         
         st.divider()
-        st.markdown("### ⛽ TRASA")
-        dist = st.number_input("DYSTANS (KM)", min_value=1, value=500)
-        fuel_p = st.number_input("CENA PALIWA (PLN/L)", min_value=0.0, value=6.55)
+        st.markdown("### 💶 WALUTA I KURSY")
+        eur_rate = st.number_input("KURS EUR/PLN", value=CONF.get("EURO_RATE", 4.30), step=0.01)
         
         st.divider()
-        st.markdown("### 📈 STAWKA")
-        rate_type = st.selectbox("MODEL", ["PLN / KM", "PLN / RYCZAŁT", "PLN / OPAKOWANIE"])
-        rate_val = st.number_input("WARTOŚĆ (PLN)", value=6.20 if "KM" in rate_type else 2800.0)
+        st.markdown("### 📈 MODEL PRZYCHODU")
+        rate_type = st.selectbox("TYP ROZLICZENIA", ["PLN / KM", "PLN / RYCZAŁT", "PLN / OPAKOWANIE"])
+        rate_val = st.number_input("WARTOŚĆ STAWKI (PLN)", value=6.50 if "KM" in rate_type else 3500.0)
 
-    # --- POBIERANIE DANYCH ---
-    active_veh_name = ""
-    total_cases = 0
+    # Pobranie danych trasy z bazy config.json
+    route = CONF["DISTANCES_AND_MYTO"][origin][dest]
+    dPL, dEU = route["distPL"], route["distEU"]
+    total_dist = dPL + dEU
 
+    # --- DANE POJAZDU ---
     if source_mode == "🔗 SYNC (ZE STACK)":
         if 'v_manifest' not in st.session_state or not st.session_state.v_manifest:
-            st.warning("⚠️ BRAK DANYCH W STACK. PRZEŁĄCZ NA MANUAL.")
-            return
+            st.warning("⚠️ BRAK TOWARU W STACK. NAJPIERW ZAPLANUJ ZAŁADUNEK.") ; return
         total_cases = sum(math.ceil(it['p_act'] / it.get('itemsPerCase', 1)) for it in st.session_state.v_manifest)
-        active_veh_name = st.selectbox("POJAZD ZE STACK", list(FLEET_MASTER_DATA.keys()))
+        # Pobieramy pierwszy dostępny pojazd z listy dostępnych kluczy mapowania
+        active_veh_name = st.selectbox("POJAZD DO ANALIZY", list(VEH_MAP.keys()))
     else:
         col1, col2 = st.columns(2)
-        with col1: active_veh_name = st.selectbox("POJAZD", list(FLEET_MASTER_DATA.keys()))
-        with col2: total_cases = st.number_input("OPAKOWANIA", min_value=1, value=12)
+        with col1: active_veh_name = st.selectbox("TYP POJAZDU", list(VEH_MAP.keys()))
+        with col2: total_cases = st.number_input("OPAKOWANIA (PALETY)", min_value=1, value=12)
 
-    # --- OBLICZENIA ---
-    veh = FLEET_MASTER_DATA[active_veh_name]
+    # Pobranie specyfikacji kosztowej z bazy
+    cat = VEH_MAP[active_veh_name]
+    v_spec = CONF["VEHICLE_DATA"][cat]
+    prices = CONF["PRICE"]
+
+    # --- LOGIKA KOSZTÓW (TOTAL COST ENGINE) ---
+    # 1. Paliwo i AdBlue (z uwzględnieniem cen krajowych i zagranicznych)
+    fuel_cons_total = total_dist * v_spec["fuelUsage"]
+    cost_fuel = (dPL * v_spec["fuelUsage"] * prices["fuelPLN"]) + (dEU * v_spec["fuelUsage"] * prices["fuelEUR"] * eur_rate)
+    cost_adblue = (dPL * v_spec["adBlueUsage"] * prices["adBluePLN"]) + (dEU * v_spec["adBlueUsage"] * prices["adBlueEUR"] * eur_rate)
     
-    # Koszty (PLN)
-    c_fuel = (dist / 100) * veh['cons'] * fuel_p
-    c_driver = 500 + (dist * 0.20)
-    c_extra = dist * 0.40
-    t_cost_pln = c_fuel + c_driver + c_extra
+    # 2. Serwis i Amortyzacja (z bazy config.json)
+    cost_service = (dPL * v_spec["serviceCostPLN"]) + (dEU * v_spec["serviceCostEUR"] * eur_rate)
     
-    # Przychód (PLN)
-    if "KM" in rate_type: revenue_pln = dist * rate_val
+    # 3. Myto (Opłaty drogowe wyciągane dynamicznie dla relacji i typu auta)
+    myto_key = f"myto{cat}"
+    cost_tolls = route.get(myto_key, 0)
+    
+    # 4. Kierowca i Diety (Uproszczone)
+    cost_driver = 500 + (total_dist * 0.15)
+    
+    total_cost_pln = cost_fuel + cost_adblue + cost_service + cost_tolls + cost_driver
+
+    # --- LOGIKA PRZYCHODÓW ---
+    if "KM" in rate_type: revenue_pln = total_dist * rate_val
     elif "RYCZAŁT" in rate_type: revenue_pln = rate_val
     else: revenue_pln = total_cases * rate_val
     
-    # Konwersja na EUR
-    revenue_eur = revenue_pln / eur_rate
-    t_cost_eur = t_cost_pln / eur_rate
-    margin_pln = revenue_pln - t_cost_pln
-    margin_eur = margin_pln / eur_rate
+    margin_pln = revenue_pln - total_cost_pln
     margin_pct = (margin_pln / revenue_pln * 100) if revenue_pln > 0 else 0
 
     # ==============================================================================
-    # 2. DASHBOARD FINANSOWY (DUAL CURRENCY)
+    # 2. DASHBOARD FINANSOWY
     # ==============================================================================
+    st.markdown(f"#### 📍 RELACJA: {origin.upper()} ➔ {dest.upper()} | {total_dist} KM")
+    
     c1, c2, c3 = st.columns(3)
     
-    # Przychód
-    c1.markdown(f"""
-        <div class="v-flow-card">
-            <div class="v-flow-label">PRZYCHÓD NETTO</div>
+    with c1: # Przychód
+        st.markdown(f"""<div class="v-flow-card"><div class="v-flow-label">PRZYCHÓD NETTO</div>
             <div class="v-flow-value-main">{revenue_pln:,.2f} PLN</div>
-            <div class="v-flow-value-sub">{revenue_eur:,.2f} EUR</div>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # Koszt
-    c2.markdown(f"""
-        <div class="v-flow-card">
-            <div class="v-flow-label">KOSZT CAŁKOWITY</div>
-            <div class="v-flow-value-main">{t_cost_pln:,.2f} PLN</div>
-            <div class="v-flow-value-sub">{t_cost_eur:,.2f} EUR</div>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # Zysk
-    m_color = "v-positive" if margin_pln > 0 else "v-negative"
-    c3.markdown(f"""
-        <div class="v-flow-card">
-            <div class="v-flow-label">MARŻA (ZYSK)</div>
-            <div class="v-flow-value-main {m_color}">{margin_pln:,.2f} PLN</div>
-            <div class="v-flow-value-sub {m_color}">{margin_eur:,.2f} EUR</div>
-            <div style="color:#CCC; font-size:0.8rem; margin-top:5px;">{margin_pct:.1f}% RENTOWNOŚCI</div>
-        </div>
-    """, unsafe_allow_html=True)
+            <div class="v-flow-value-sub">{revenue_pln/eur_rate:,.2f} EUR</div></div>""", unsafe_allow_html=True)
+            
+    with c2: # Koszt
+        st.markdown(f"""<div class="v-flow-card"><div class="v-flow-label">KOSZT CAŁKOWITY</div>
+            <div class="v-flow-value-main">{total_cost_pln:,.2f} PLN</div>
+            <div class="v-flow-value-sub">{total_cost_pln/eur_rate:,.2f} EUR</div></div>""", unsafe_allow_html=True)
+            
+    with c3: # Zysk
+        m_clr = "v-positive" if margin_pln > 0 else "v-negative"
+        st.markdown(f"""<div class="v-flow-card"><div class="v-flow-label">MARŻA (ZYSK)</div>
+            <div class="v-flow-value-main {m_clr}">{margin_pln:,.2f} PLN</div>
+            <div class="v-flow-value-sub {m_clr}">{margin_pln/eur_rate:,.2f} EUR</div>
+            <div style="color:#888; font-size:0.8rem; margin-top:5px;">RENTOWNOŚĆ: {margin_pct:.1f}%</div></div>""", unsafe_allow_html=True)
 
-    # --- ANALIZA TAKTYCZNA ---
+    # --- SZCZEGÓŁOWY RAPORT OPERACYJNY ---
     st.divider()
     ca, cb = st.columns(2)
+    
     with ca:
-        st.markdown("### 📊 ANALIZA KOSZTÓW")
-        df_c = pd.DataFrame({
-            "SKŁADNIK": ["Paliwo", "Kierowca", "Amortyzacja"],
-            "PLN": [c_fuel, c_driver, c_extra],
-            "EUR": [c_fuel/eur_rate, c_driver/eur_rate, c_extra/eur_rate]
+        st.markdown("### 📊 STRUKTURA KOSZTÓW")
+        cost_breakdown = pd.DataFrame({
+            "SKŁADNIK": ["Paliwo", "AdBlue", "Opłaty Drogowe (Myto)", "Serwis i Amortyzacja", "Kierowca"],
+            "PLN": [cost_fuel, cost_adblue, cost_tolls, cost_service, cost_driver],
+            "EUR": [cost_fuel/eur_rate, cost_adblue/eur_rate, cost_tolls/eur_rate, cost_service/eur_rate, cost_driver/eur_rate]
         })
-        st.table(df_c.set_index("SKŁADNIK"))
+        st.table(cost_breakdown.set_index("SKŁADNIK"))
         
     with cb:
-        st.markdown("### 🚀 PROGI RENTOWNOŚCI")
-        bep_pln = t_cost_pln / dist
-        bep_eur = bep_pln / eur_rate
-        st.info(f"MINIMALNA STAWKA (BEP): **{bep_pln:.2f} PLN/KM** | **{bep_eur:.2f} EUR/KM**")
-        st.write(f"**Wykorzystanie LDM:** {(total_cases * 1.2 / veh['total_ldm'] * 100):.1f}% (Szacunkowo)")
+        st.markdown("### ⛽ DANE EKSPLOATACYJNE")
+        st.info(f"**PRÓG RENTOWNOŚCI (BEP):** {total_cost_pln/total_dist:.2f} PLN/KM")
+        st.write(f"**Pojazd:** {active_veh_name} (Kategoria: {cat})")
+        st.write(f"**Spalanie całkowite:** {fuel_cons_total:.1f} L")
+        st.write(f"**Wymagane tankowanie:** {1 if fuel_cons_total > v_spec['tankCapacity'] else 0} razy na trasie")
+        st.write(f"**Koszt na opakowanie:** {total_cost_pln/total_cases:.2f} PLN")
 
-    if st.button("📄 GENERUJ OFERTĘ DWUWALUTOWĄ"):
-        st.code(f"""
-        OFERTA VORTEZA FLOW
-        Dystans: {dist} km | Pojazd: {active_veh_name}
-        CENA PLN: {revenue_pln:,.2f} netto
-        CENA EUR: {revenue_eur:,.2f} netto (Kurs: {eur_rate})
-        """)
+    # --- GENEROWANIE OFERTY ---
+    st.divider()
+    if st.button("📄 GENERUJ OFERTĘ OFICJALNĄ"):
+        offer = f"""
+        VORTEZA HUB - OFERTA TRANSPORTOWA
+        ---------------------------------
+        TRASA: {origin} -> {dest} ({total_dist} km)
+        POJAZD: {active_veh_name}
+        ŁADUNEK: {total_cases} opakowań
+        
+        CENA NETTO: {revenue_pln:,.2f} PLN
+        CENA NETTO: {revenue_pln/eur_rate:,.2f} EUR (Kurs: {eur_rate})
+        ---------------------------------
+        Oferta ważna 24h.
+        """
+        st.code(offer, language="text")
+        st.toast("Oferta przygotowana!")
 
 if __name__ == "__main__":
     run_flow()
