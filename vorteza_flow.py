@@ -7,7 +7,7 @@ import math
 import base64
 
 # ==============================================================================
-# 0. KONFIGURACJA ŚCIEŻEK (ZGODNIE ZE STRUKTURĄ GITHUB)
+# 0. KONFIGURACJA ŚCIEŻEK I ŁADOWANIE BAZY (ZGODNIE ZE STRUKTURĄ GITHUB)
 # ==============================================================================
 PATH_CONFIG = os.path.join("data", "config.json")
 PATH_BG = os.path.join("assets", "bg_vorteza.png")
@@ -25,7 +25,7 @@ def load_config():
 
 CONF = load_config()
 
-# Mapowanie modeli transportowych na kategorie kosztowe z bazy danych config.json
+# Mapowanie modeli z modułu STACK na kategorie kosztowe z bazy config.json
 VEH_MAP = {
     "TIR FTL Mega 13.6m": "FTL",
     "TIR FTL Standard 13.6m": "FTL",
@@ -76,7 +76,7 @@ def inject_vorteza_flow_ui():
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. SILNIK OBLICZENIOWY FLOW
+# 2. SILNIK OBLICZENIOWY FLOW v1.6
 # ==============================================================================
 def run_flow():
     inject_vorteza_flow_ui()
@@ -86,7 +86,7 @@ def run_flow():
         st.error("Baza danych nie została załadowana. Sprawdź plik data/config.json.")
         return
 
-    # --- SIDEBAR: KONFIGURACJA TRASY I STAWEK ---
+    # --- SIDEBAR: KONFIGURACJA BIZNESOWA ---
     with st.sidebar:
         st.markdown("### 🛠️ TRYB OBLICZEŃ")
         source_mode = st.radio("ŹRÓDŁO DANYCH", ["🔗 SYNC (ZE STACK)", "⚡ MANUAL (SZYBKI)"], label_visibility="collapsed")
@@ -95,18 +95,26 @@ def run_flow():
         st.markdown("### 🗺️ WYBÓR TRASY")
         origins = list(CONF["DISTANCES_AND_MYTO"].keys())
         origin = st.selectbox("PUNKT STARTU", origins)
-        
         destinations = list(CONF["DISTANCES_AND_MYTO"][origin].keys())
         dest = st.selectbox("PUNKT DOCELOWY", destinations)
         
-        st.divider()
-        st.markdown("### 💶 WALUTA")
-        eur_rate = st.number_input("KURS EUR/PLN", value=CONF.get("EURO_RATE", 4.30), step=0.01)
+        eur_rate = st.number_input("KURS EUR/PLN", value=CONF.get("EURO_RATE", 4.30), step=0.01) #
         
         st.divider()
         st.markdown("### 📈 MODEL PRZYCHODU")
-        rate_type = st.selectbox("TYP ROZLICZENIA", ["PLN / KM", "PLN / RYCZAŁT", "PLN / OPAKOWANIE"])
-        rate_val = st.number_input("WARTOŚĆ STAWKI (PLN)", value=6.50 if "KM" in rate_type else 3500.0)
+        # Wybór waluty dla stawki
+        c_cols = st.columns([2, 1])
+        with c_cols[0]:
+            rate_type = st.selectbox("MODEL", ["PLN / KM", "PLN / RYCZAŁT", "PLN / OPAKOWANIE"])
+        with c_cols[1]:
+            rate_curr = st.selectbox("WALUTA", ["PLN", "EUR"], key="rate_curr")
+        
+        rate_val = st.number_input(f"WARTOŚĆ STAWKI ({rate_curr})", value=6.50 if rate_curr == "PLN" else 1.50)
+
+        st.divider()
+        st.markdown("### 🏗️ KOSZTY DODATKOWE")
+        add_curr = st.selectbox("WALUTA KOSZTÓW", ["PLN", "EUR"], key="add_curr")
+        additional_costs = st.number_input(f"OPŁATY DODATKOWE ({add_curr})", value=0.0)
 
     # Dane trasy pobrane z config.json
     route = CONF["DISTANCES_AND_MYTO"][origin][dest]
@@ -132,34 +140,37 @@ def run_flow():
     v_spec = CONF["VEHICLE_DATA"][cat]
     prices = CONF["PRICE"]
 
-    # --- LOGIKA KOSZTÓW (TOTAL COST ENGINE) ---
-    # Paliwo i AdBlue (ceny PL i EU z config.json)
+    # --- OBLICZENIA (KOSZTY) ---
+    # Paliwo, AdBlue i Serwis zaciągane z config w odpowiednich walutach
     cost_fuel = (dPL * v_spec["fuelUsage"] * prices["fuelPLN"]) + (dEU * v_spec["fuelUsage"] * prices["fuelEUR"] * eur_rate)
     cost_adblue = (dPL * v_spec["adBlueUsage"] * prices["adBluePLN"]) + (dEU * v_spec["adBlueUsage"] * prices["adBlueEUR"] * eur_rate)
-    
-    # Serwis i Amortyzacja
     cost_service = (dPL * v_spec["serviceCostPLN"]) + (dEU * v_spec["serviceCostEUR"] * eur_rate)
     
     # Myto (dynamicznie pobierane dla trasy i kategorii pojazdu)
     myto_key = f"myto{cat}"
     cost_tolls = route.get(myto_key, 0)
     
-    # Kierowca i Diety (Uproszczone)
-    cost_driver = 500 + (total_dist * 0.15)
+    # Przeliczenie kosztów dodatkowych na PLN
+    add_costs_pln = additional_costs if add_curr == "PLN" else (additional_costs * eur_rate)
     
-    total_cost_pln = cost_fuel + cost_adblue + cost_service + cost_tolls + cost_driver
+    cost_driver = 500 + (total_dist * 0.15)
+    total_cost_pln = cost_fuel + cost_adblue + cost_service + cost_tolls + cost_driver + add_costs_pln
 
-    # --- LOGIKA PRZYCHODU ---
-    if "KM" in rate_type: revenue_pln = total_dist * rate_val
-    elif "RYCZAŁT" in rate_type: revenue_pln = rate_val
-    else: revenue_pln = total_cases * rate_val
+    # --- LOGIKA PRZYCHODU (Konwersja na PLN dla bazy obliczeniowej) ---
+    raw_revenue = 0
+    if "KM" in rate_type: raw_revenue = total_dist * rate_val
+    elif "RYCZAŁT" in rate_type: raw_revenue = rate_val
+    else: raw_revenue = total_cases * rate_val
+    
+    revenue_pln = raw_revenue if rate_curr == "PLN" else (raw_revenue * eur_rate)
     
     margin_pln = revenue_pln - total_cost_pln
     margin_pct = (margin_pln / revenue_pln * 100) if revenue_pln > 0 else 0
 
     # ==============================================================================
-    # 3. DASHBOARD FINANSOWY (PLN & EUR)
+    # 3. DASHBOARD FINANSOWY (DUAL CURRENCY)
     # ==============================================================================
+    
     st.markdown(f"#### 📍 RELACJA: {origin.upper()} ➔ {dest.upper()} | {total_dist} KM")
     
     c1, c2, c3 = st.columns(3)
@@ -175,8 +186,8 @@ def run_flow():
     with ca:
         st.markdown("### 📊 STRUKTURA KOSZTÓW (PLN)")
         cost_df = pd.DataFrame({
-            "SKŁADNIK": ["Paliwo", "AdBlue", "Myto (Opłaty)", "Serwis", "Kierowca"],
-            "WARTOŚĆ": [cost_fuel, cost_adblue, cost_tolls, cost_service, cost_driver]
+            "SKŁADNIK": ["Paliwo", "AdBlue", "Myto (Opłaty)", "Serwis", "Kierowca", "Dodatkowe"],
+            "WARTOŚĆ": [cost_fuel, cost_adblue, cost_tolls, cost_service, cost_driver, add_costs_pln]
         })
         st.table(cost_df.set_index("SKŁADNIK"))
         
