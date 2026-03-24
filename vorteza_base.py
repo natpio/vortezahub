@@ -1,50 +1,39 @@
+# -*- coding: utf-8 -*-
 import streamlit as st
 import json
-import requests
 import base64
 import gspread
 import pandas as pd
+import os
 from datetime import datetime
 from google.oauth2.service_account import Credentials
 
 # =========================================================
-# 1. KONFIGURACJA I ZASOBY
+# 1. KONFIGURACJA ŚCIEŻEK I ZASOBÓW
 # =========================================================
-try:
-    GITHUB_TOKEN = st.secrets["G_TOKEN"]
-except:
-    GITHUB_TOKEN = None 
-
-REPO_OWNER = "natpio"
-REPO_NAME = "vortezabasepep"
+PATH_CHECKLIST = os.path.join("data", "lista_kontrolna.json")
+PATH_BG = os.path.join("assets", "bg_vorteza.png")
+PATH_LOGO = os.path.join("assets", "logo_vorteza.png")
 SHEET_ID = "1JV-vXpwAbvvboQd7eijashVmS3kkOqTf_LJrbrsWSxo"
 
-def get_github_file(file_path):
-    if not GITHUB_TOKEN: 
-        return None
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{file_path}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+def load_vorteza_asset_b64(file_path):
     try:
-        res = requests.get(url, headers=headers)
-        if res.status_code == 200:
-            return res.json()
-    except: 
-        pass
+        if os.path.exists(file_path):
+            with open(file_path, 'rb') as f:
+                return base64.b64encode(f.read()).decode()
+        return ""
+    except: return ""
+
+def load_checklist_local():
+    """Wczytuje listę kontrolną z lokalnego folderu data/."""
+    if os.path.exists(PATH_CHECKLIST):
+        with open(PATH_CHECKLIST, 'r', encoding='utf-8') as f:
+            return json.load(f)
     return None
 
-def get_remote_data():
-    content = get_github_file("lista_kontrolna.json")
-    if content:
-        data = json.loads(base64.b64decode(content['content']).decode('utf-8'))
-        return data, content['sha']
-    return None, None
-
-def get_bg_base64():
-    content = get_github_file("bg_vorteza.png")
-    if content and 'content' in content:
-        return content['content'].replace("\n", "").replace("\r", "")
-    return ""
-
+# =========================================================
+# 2. SILNIK GOOGLE SHEETS
+# =========================================================
 def get_gspread_client():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds_info = st.secrets["GCP_SERVICE_ACCOUNT"]
@@ -58,7 +47,7 @@ def load_from_google_sheets():
         data = sheet.get_all_records()
         return pd.DataFrame(data)
     except Exception as e:
-        st.error(f"Błąd: {e}")
+        st.error(f"Błąd połączenia z bazą danych: {e}")
         return pd.DataFrame()
 
 def save_to_google_sheets(row_data):
@@ -67,40 +56,13 @@ def save_to_google_sheets(row_data):
         sheet = client.open_by_key(SHEET_ID).sheet1
         sheet.append_row(row_data)
         return True
-    except: 
-        return False
-
-def delete_row_from_sheets(row_index):
-    try:
-        client = get_gspread_client()
-        sheet = client.open_by_key(SHEET_ID).sheet1
-        sheet.delete_rows(row_index + 2)
-        return True
-    except Exception as e:
-        st.error(f"Błąd: {e}")
-        return False
-
-def resolve_single_fault(row_index, fault_to_remove, current_status):
-    try:
-        client = get_gspread_client()
-        sheet = client.open_by_key(SHEET_ID).sheet1
-        prefix = "ALERT: " if "ALERT:" in current_status else ""
-        faults_content = current_status.replace("ALERT:", "").strip()
-        fault_list = [f.strip() for f in faults_content.split(",") if f.strip()]
-        if fault_to_remove in fault_list:
-            fault_list.remove(fault_to_remove)
-        new_status = prefix + ", ".join(fault_list) if fault_list else "NOMINAL"
-        sheet.update_cell(row_index + 2, 5, new_status)
-        return True
-    except Exception as e:
-        st.error(f"Błąd: {e}")
-        return False
+    except: return False
 
 # =========================================================
-# 2. INTERFEJS UŻYTKOWNIKA
+# 3. INTERFEJS I STYLIZACJA
 # =========================================================
-def apply_vorteza_design():
-    bg_data = get_bg_base64()
+def apply_base_theme():
+    bg_data = load_vorteza_asset_b64(PATH_BG)
     bg_style = f"""
         .stApp {{
             background: linear-gradient(rgba(0,0,0,0.92), rgba(0,0,0,0.92)), 
@@ -114,133 +76,54 @@ def apply_vorteza_design():
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Michroma&family=Montserrat:wght@400;700&display=swap');
         {bg_style}
-        [data-testid="stWidgetLabel"], .stMarkdown, p, label {{ color: #B58863 !important; font-family: 'Montserrat', sans-serif !important; }}
         .vorteza-header {{ font-family: 'Michroma', sans-serif !important; color: #B58863 !important; text-align: center; letter-spacing: 4px; padding: 20px; text-transform: uppercase; }}
-        section[data-testid="stSidebar"] {{ background-color: rgba(5, 5, 5, 0.98) !important; border-right: 1px solid #B58863; }}
-        .log-entry {{ background-color: rgba(12, 12, 12, 0.95) !important; border-left: 8px solid #B58863 !important; padding: 20px; margin-bottom: 5px; color: #B58863 !important; border-radius: 4px; }}
+        .log-entry {{ background-color: rgba(12, 12, 12, 0.95) !important; border-left: 8px solid #B58863 !important; padding: 20px; margin-bottom: 15px; border-radius: 4px; }}
         .log-entry-alert {{ border-left: 8px solid #FF4B4B !important; }}
-        .card-plate {{ font-family: 'Michroma', sans-serif !important; font-size: 1.4rem !important; color: #B58863 !important; }}
-        input, textarea, [data-baseweb="select"] {{ background-color: rgba(255, 255, 255, 0.05) !important; color: #B58863 !important; border: 1px solid rgba(181, 136, 99, 0.3) !important; }}
-        .stButton>button {{ background-color: transparent !important; color: #B58863 !important; border: 1px solid #B58863 !important; width: 100%; transition: 0.3s; }}
-        .stButton>button:hover {{ background-color: #B58863 !important; color: black !important; }}
-        #MainMenu, footer, header {{visibility: hidden;}}
-        .stDeployButton {{display:none;}}
         </style>
     """, unsafe_allow_html=True)
 
 # =========================================================
-# 3. LOGIKA GŁÓWNA
+# 4. GŁÓWNA FUNKCJA MODUŁU (DLA HUB)
 # =========================================================
-st.set_page_config(page_title="VORTEZA LOGISTICS", layout="wide")
-apply_vorteza_design()
-
-if "auth" not in st.session_state: 
-    st.session_state.auth = False
-
-if not st.session_state.auth:
-    col1, col2, col3 = st.columns([1, 1.5, 1])
-    with col2:
-        try: st.image('logo_vorteza.png', use_container_width=True)
-        except: pass
-        st.markdown("<h1 class='vorteza-header'>SYSTEM ACCESS</h1>", unsafe_allow_html=True)
-        u = st.text_input("OPERATOR ID")
-        p = st.text_input("SECURITY KEY", type="password")
-        if st.button("AUTHORIZE"):
-            users = st.secrets.get("USERS", {})
-            if u in users and str(users[u]) == p:
-                st.session_state.auth, st.session_state.user = True, u
-                st.rerun()
-            else: 
-                st.error("Access Denied")
-else:
-    is_dispatcher = any(x in st.session_state.user.lower() for x in ["dyspozytor", "admin"])
+def run_base():
+    apply_base_theme()
     
-    with st.sidebar:
-        try: st.image('logo_vorteza.png', width=150)
-        except: pass
-        st.write(f"USER: **{st.session_state.user.upper()}**")
-        st.markdown("---")
-        
-        if is_dispatcher:
-            df_full = load_from_google_sheets()
-            if not df_full.empty:
-                raw_plates = df_full['Numer Rejestracyjny'].astype(str).unique()
-                plates = ["WSZYSTKIE"] + sorted([p for p in raw_plates if p.strip()])
-                f_plate = st.selectbox("POJAZD", plates)
-                f_alerts = st.checkbox("TYLKO ALERTY")
-            if st.button("ODŚWIEŻ DANE"): 
-                st.rerun()
-        
-        if st.button("WYLOGUJ"):
-            st.session_state.auth = False
-            st.rerun()
+    # Ustalenie użytkownika z sesji Hub-a
+    current_user = st.session_state.get("username", "OPERATOR")
+    is_dispatcher = any(x in current_user.lower() for x in ["dyspozytor", "admin"])
+    
+    st.markdown("<h2 class='vorteza-header'>VORTEZA BASE | LOGISTICS CONTROL</h2>", unsafe_allow_html=True)
 
     if is_dispatcher:
-        st.markdown("<h2 class='vorteza-header'>COMMAND CENTER</h2>", unsafe_allow_html=True)
-        
-        if not df_full.empty:
-            df = df_full.copy()
-            df['Data i Godzina'] = pd.to_datetime(df['Data i Godzina'], errors='coerce')
-            
-            if f_plate != "WSZYSTKIE":
-                df = df[df['Numer Rejestracyjny'].astype(str) == f_plate]
-            if f_alerts:
-                df = df[df['Wynik Kontroli'].str.contains("ALERT|USTERK|BRAK", na=False, case=False)]
-            
-            df = df.sort_values(by='Data i Godzina', ascending=False)
-
-            for idx, row in df.iterrows():
-                status_raw = str(row.get('Wynik Kontroli', ''))
-                is_alert = any(word in status_raw.upper() for word in ["ALERT", "USTERK", "BRAK"])
+        # --- WIDOK DYSPOZYTORA (MONITORING) ---
+        df = load_from_google_sheets()
+        if not df.empty:
+            st.subheader("Ostatnie Raporty Floty")
+            for idx, row in df.iloc[::-1].iterrows(): # Od najnowszych
+                is_alert = "ALERT" in str(row.get('Wynik Kontroli', ''))
                 entry_class = "log-entry log-entry-alert" if is_alert else "log-entry"
                 
                 st.markdown(f"""
                 <div class="{entry_class}">
-                    <div style="display:flex; justify-content:space-between;">
-                        <span class="card-plate">{row.get('Numer Rejestracyjny', 'N/A')}</span>
-                        <span style="opacity:0.7;">{row.get('Data i Godzina').strftime('%Y-%m-%d | %H:%M') if pd.notnull(row.get('Data i Godzina')) else 'N/A'}</span>
-                    </div>
-                    <div style="font-size:0.9rem; margin-top:5px;">
-                        OP: {row.get('Operator ID', 'N/A')} | KM: {row.get('Przebieg (km)', 0)}
-                    </div>
+                    <b style="color:#B58863; font-size:1.2rem;">{row.get('Numer Rejestracyjny', 'N/A')}</b> | 
+                    Data: {row.get('Data i Godzina', 'N/A')} | OP: {row.get('Operator ID', 'N/A')}<br>
+                    <span style="color:{'#FF4B4B' if is_alert else '#00FF41'}">STATUS: {row.get('Wynik Kontroli', 'NOMINAL')}</span><br>
+                    <small>Przebieg: {row.get('Przebieg (km)', 0)} km | Uwagi: {row.get('Uwagi i Obserwacje', '-')}</small>
                 </div>
                 """, unsafe_allow_html=True)
-
-                col_faults, col_actions = st.columns([3, 1])
-                
-                with col_faults:
-                    if is_alert:
-                        st.write("🔧 **AKTYWNE PROBLEMY:**")
-                        clean_text = status_raw.replace("ALERT:", "").strip()
-                        faults_list = [f.strip() for f in clean_text.split(",") if f.strip()]
-                        
-                        for f_name in faults_list:
-                            if st.button(f"ZALICZONE: {f_name}", key=f"res_{idx}_{f_name}"):
-                                if resolve_single_fault(idx, f_name, status_raw):
-                                    st.success(f"OK: {f_name}")
-                                    st.rerun()
-                    else:
-                        st.success("STATUS POJAZDU: NOMINAL")
-                    
-                    if row.get("Uwagi i Obserwacje"):
-                        st.info(f"Komentarz: {row.get('Uwagi i Obserwacje')}")
-
-                with col_actions:
-                    st.write("⚙️ **ADMIN:**")
-                    if st.button("USUŃ CAŁY WPIS", key=f"del_row_{idx}"):
-                        if delete_row_from_sheets(idx):
-                            st.rerun()
-                st.markdown("---")
         else:
-            st.warning("Brak danych.")
+            st.info("Brak aktywnych logów w bazie Google Sheets.")
 
     else:
-        st.markdown("<h2 class='vorteza-header'>SYSTEM PROTOKOŁÓW</h2>", unsafe_allow_html=True)
-        data_gh, _ = get_remote_data()
+        # --- WIDOK KIEROWCY (PROTOKÓŁ) ---
+        data_gh = load_checklist_local()
         
         with st.form("driver_form", clear_on_submit=True):
-            r = st.text_input("NUMER REJESTRACYJNY").upper()
-            k = st.number_input("AKTUALNY PRZEBIEG (KM)", step=1)
+            col1, col2 = st.columns(2)
+            with col1:
+                r_plate = st.text_input("NUMER REJESTRACYJNY").upper()
+            with col2:
+                k_odo = st.number_input("AKTUALNY PRZEBIEG (KM)", step=1)
             
             check_results = {}
             if data_gh and "lista_kontrolna" in data_gh:
@@ -250,16 +133,21 @@ else:
                             res = st.checkbox(pt, key=f"f_{pt}")
                             check_results[pt] = "OK" if res else "BRAK"
             
-            u = st.text_area("DODATKOWE UWAGI / OBSERWACJE")
+            u_notes = st.text_area("DODATKOWE UWAGI / OBSERWACJE")
             
-            if st.form_submit_button("WYŚLIJ PROTOKÓŁ DO BAZY"):
-                if not r: 
-                    st.error("Wymagany numer!")
+            if st.form_submit_button("WYŚLIJ PROTOKÓŁ DO SYSTEMU"):
+                if not r_plate:
+                    st.error("Błąd: Numer rejestracyjny jest wymagany!")
                 else:
                     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
                     errs = [pt for pt, v in check_results.items() if v == "BRAK"]
                     status = "NOMINAL" if not errs else f"ALERT: {', '.join(errs)}"
                     
-                    if save_to_google_sheets([ts, st.session_state.user, r, k, status, u]):
-                        st.success("Zapisano.")
-                        st.rerun()
+                    if save_to_google_sheets([ts, current_user, r_plate, k_odo, status, u_notes]):
+                        st.success("Protokół został pomyślnie wysłany do bazy.")
+                        st.balloons()
+                    else:
+                        st.error("Błąd zapisu w Google Sheets. Sprawdź połączenie.")
+
+if __name__ == "__main__":
+    run_base()
