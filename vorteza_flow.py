@@ -7,27 +7,25 @@ import math
 import base64
 
 # ==============================================================================
-# 0. KONFIGURACJA ŚCIEŻEK I ŁADOWANIE BAZY (ZGODNIE ZE STRUKTURĄ GITHUB)
+# 0. KONFIGURACJA ŚCIEŻEK (ZGODNIE ZE STRUKTURĄ GITHUB)
 # ==============================================================================
 PATH_CONFIG = os.path.join("data", "config.json")
 PATH_BG = os.path.join("assets", "bg_vorteza.png")
 
 def load_config():
-    """Wczytuje parametry kosztowe i trasy z folderu data/."""
+    """Wczytuje parametry kosztowe, trasy i stawki myta z bazy danych."""
     try:
         if os.path.exists(PATH_CONFIG):
             with open(PATH_CONFIG, "r", encoding="utf-8") as f:
                 return json.load(f)
-        else:
-            st.error(f"BŁĄD: Nie znaleziono pliku {PATH_CONFIG}")
-            return {}
+        return {}
     except Exception as e:
         st.error(f"BŁĄD ŁADOWANIA CONFIGA: {e}")
         return {}
 
 CONF = load_config()
 
-# Mapowanie modeli z modułu STACK na kategorie kosztowe z CONFIG
+# Mapowanie modeli transportowych na kategorie kosztowe z bazy danych config.json
 VEH_MAP = {
     "TIR FTL Mega 13.6m": "FTL",
     "TIR FTL Standard 13.6m": "FTL",
@@ -88,7 +86,7 @@ def run_flow():
         st.error("Baza danych nie została załadowana. Sprawdź plik data/config.json.")
         return
 
-    # --- SIDEBAR: KONFIGURACJA TRASY ---
+    # --- SIDEBAR: KONFIGURACJA TRASY I STAWEK ---
     with st.sidebar:
         st.markdown("### 🛠️ TRYB OBLICZEŃ")
         source_mode = st.radio("ŹRÓDŁO DANYCH", ["🔗 SYNC (ZE STACK)", "⚡ MANUAL (SZYBKI)"], label_visibility="collapsed")
@@ -110,44 +108,48 @@ def run_flow():
         rate_type = st.selectbox("TYP ROZLICZENIA", ["PLN / KM", "PLN / RYCZAŁT", "PLN / OPAKOWANIE"])
         rate_val = st.number_input("WARTOŚĆ STAWKI (PLN)", value=6.50 if "KM" in rate_type else 3500.0)
 
-    # Dane trasy z bazy
+    # Dane trasy pobrane z config.json
     route = CONF["DISTANCES_AND_MYTO"][origin][dest]
     dPL, dEU = route["distPL"], route["distEU"]
     total_dist = dPL + dEU
 
-    # --- OBSŁUGA POJAZDU ---
+    # --- OBSŁUGA DANYCH WEJŚCIOWYCH ---
     if source_mode == "🔗 SYNC (ZE STACK)":
         if 'v_manifest' not in st.session_state or not st.session_state.v_manifest:
-            st.warning("⚠️ BRAK DANYCH W STACK. PRZEŁĄCZ NA MANUAL LUB DODAJ TOWAR.")
-            return
+            st.warning("⚠️ BRAK DANYCH W STACK. NAJPIERW DODAJ TOWAR DO PLANERA 3D."); return
         total_cases = sum(math.ceil(it['p_act'] / it.get('itemsPerCase', 1)) for it in st.session_state.v_manifest)
-        total_weight = sum(it['weight'] * math.ceil(it['p_act'] / it.get('itemsPerCase', 1)) for it in st.session_state.v_manifest)
+        total_weight = sum(it.get('weight', 0) * math.ceil(it['p_act'] / it.get('itemsPerCase', 1)) for it in st.session_state.v_manifest)
         st.markdown(f"<div class='v-badge-unit'>POBRANO ZE STACK: {total_cases} OPAKOWAŃ | {total_weight} KG</div>", unsafe_allow_html=True)
-        active_veh_name = st.selectbox("POJAZD DO WYCENY", list(VEH_MAP.keys()))
+        active_veh_name = st.selectbox("POJAZD DO ANALIZY", list(VEH_MAP.keys()))
     else:
         col1, col2 = st.columns(2)
         with col1: active_veh_name = st.selectbox("TYP POJAZDU", list(VEH_MAP.keys()))
         with col2: total_cases = st.number_input("OPAKOWANIA", min_value=1, value=12)
         total_weight = total_cases * 450
 
-    # Parametry kosztowe z config.json
+    # Parametry kosztowe wyciągnięte z bazy danych
     cat = VEH_MAP[active_veh_name]
     v_spec = CONF["VEHICLE_DATA"][cat]
     prices = CONF["PRICE"]
 
-    # --- OBLICZENIA (KOSZTY) ---
+    # --- LOGIKA KOSZTÓW (TOTAL COST ENGINE) ---
+    # Paliwo i AdBlue (ceny PL i EU z config.json)
     cost_fuel = (dPL * v_spec["fuelUsage"] * prices["fuelPLN"]) + (dEU * v_spec["fuelUsage"] * prices["fuelEUR"] * eur_rate)
     cost_adblue = (dPL * v_spec["adBlueUsage"] * prices["adBluePLN"]) + (dEU * v_spec["adBlueUsage"] * prices["adBlueEUR"] * eur_rate)
+    
+    # Serwis i Amortyzacja
     cost_service = (dPL * v_spec["serviceCostPLN"]) + (dEU * v_spec["serviceCostEUR"] * eur_rate)
     
-    # Myto (zależne od kategorii pojazdu)
+    # Myto (dynamicznie pobierane dla trasy i kategorii pojazdu)
     myto_key = f"myto{cat}"
     cost_tolls = route.get(myto_key, 0)
     
+    # Kierowca i Diety (Uproszczone)
     cost_driver = 500 + (total_dist * 0.15)
+    
     total_cost_pln = cost_fuel + cost_adblue + cost_service + cost_tolls + cost_driver
 
-    # --- PRZYCHÓD ---
+    # --- LOGIKA PRZYCHODU ---
     if "KM" in rate_type: revenue_pln = total_dist * rate_val
     elif "RYCZAŁT" in rate_type: revenue_pln = rate_val
     else: revenue_pln = total_cases * rate_val
@@ -156,9 +158,9 @@ def run_flow():
     margin_pct = (margin_pln / revenue_pln * 100) if revenue_pln > 0 else 0
 
     # ==============================================================================
-    # 3. DASHBOARD FINANSOWY
+    # 3. DASHBOARD FINANSOWY (PLN & EUR)
     # ==============================================================================
-        st.markdown(f"#### 📍 TRASA: {origin.upper()} ➔ {dest.upper()} ({total_dist} KM)")
+    st.markdown(f"#### 📍 RELACJA: {origin.upper()} ➔ {dest.upper()} | {total_dist} KM")
     
     c1, c2, c3 = st.columns(3)
     c1.markdown(f'<div class="v-flow-card"><div class="v-flow-label">PRZYCHÓD NETTO</div><div class="v-flow-value-main">{revenue_pln:,.2f} PLN</div><div class="v-flow-value-sub">{revenue_pln/eur_rate:,.2f} EUR</div></div>', unsafe_allow_html=True)
@@ -167,7 +169,7 @@ def run_flow():
     m_clr = "v-positive" if margin_pln > 0 else "v-negative"
     c3.markdown(f'<div class="v-flow-card"><div class="v-flow-label">MARŻA (ZYSK)</div><div class="v-flow-value-main {m_clr}">{margin_pln:,.2f} PLN</div><div class="v-flow-value-sub {m_clr}">{margin_pct:.1f}% RENTOWNOŚCI</div></div>', unsafe_allow_html=True)
 
-    # Szczegóły
+    # Szczegółowa analiza
     st.divider()
     ca, cb = st.columns(2)
     with ca:
@@ -180,8 +182,8 @@ def run_flow():
         
     with cb:
         st.markdown("### ⛽ ANALIZA OPERACYJNA")
-        st.info(f"**PRÓG RENTOWNOŚCI:** {total_cost_pln/total_dist:.2f} PLN/KM")
-        st.write(f"**Pojazd:** {active_veh_name}")
+        st.info(f"**PRÓG RENTOWNOŚCI (BEP):** {total_cost_pln/total_dist:.2f} PLN/KM")
+        st.write(f"**Pojazd:** {active_veh_name} (Kategoria: {cat})")
         st.write(f"**Spalanie całkowite:** {total_dist * v_spec['fuelUsage']:.1f} L")
         st.write(f"**Koszt na opakowanie:** {total_cost_pln/total_cases:.2f} PLN")
 
