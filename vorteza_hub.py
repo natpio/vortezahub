@@ -34,12 +34,11 @@ def get_dashboard_stats():
             scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         )
         client = gspread.authorize(creds)
-        # Twój identyfikator arkusza
         sheet = client.open_by_key("1JV-vXpwAbvvboQd7eijashVmS3kkOqTf_LJrbrsWSxo").sheet1
         df_base = pd.DataFrame(sheet.get_all_records())
         if not df_base.empty:
             stats["vehicles"] = len(df_base['Numer Rejestracyjny'].unique())
-            stats["alerts"] = len(df_base[df_base['Wynik Kontroli'].str.contains("ALERT", na=False)])
+            stats["alerts"] = len(df_base[df_base['Wynik Kontroli'].astype(str).str.contains("ALERT", na=False)])
     except: pass
 
     # Dane z lokalnych plików JSON (FLOW i STACK)
@@ -74,7 +73,11 @@ def inject_hub_theme():
 def main_hub():
     inject_hub_theme()
     
-    if "global_auth" not in st.session_state: st.session_state.global_auth = False
+    # --- INICJALIZACJA SESJI (Fix dla AttributeError) ---
+    if "global_auth" not in st.session_state: 
+        st.session_state.global_auth = False
+    if "username" not in st.session_state: 
+        st.session_state.username = "UNAUTHORIZED"
 
     # --- EKRAN LOGOWANIA ---
     if not st.session_state.global_auth:
@@ -102,6 +105,7 @@ def main_hub():
         st.markdown(f"**CZAS:** {datetime.now().strftime('%H:%M:%S')}")
         if st.button("TERMINATE SESSION"):
             st.session_state.global_auth = False
+            st.session_state.username = "UNAUTHORIZED"
             st.rerun()
 
     # --- ROUTING (PRZEŁĄCZANIE MODUŁÓW) ---
@@ -113,7 +117,11 @@ def main_hub():
         
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("POJAZDY W SYSTEMIE", s["vehicles"])
-        c2.metric("AKTYWNE ALERTY", s["alerts"], delta=s["alerts"], delta_color="inverse" if s["alerts"] > 0 else "normal")
+        
+        # Logika kolorowania alertów
+        a_color = "inverse" if s["alerts"] > 0 else "normal"
+        c2.metric("AKTYWNE ALERTY", s["alerts"], delta=s["alerts"], delta_color=a_color)
+        
         c3.metric("KURS EURO (V)", f"{s['euro']} PLN")
         c4.metric("BAZA SKU", s["skus"])
         
@@ -123,9 +131,12 @@ def main_hub():
         else:
             st.success("Status floty: NOMINALNY. Wszystkie systemy sprawne.")
 
-    elif app_mode == "PLANER 3D (STACK)": run_stack()
-    elif app_mode == "FINANSE (FLOW)": run_flow()
-    elif app_mode == "FLOTA (BASE)": run_base()
+    elif app_mode == "PLANER 3D (STACK)": 
+        run_stack()
+    elif app_mode == "FINANSE (FLOW)": 
+        run_flow()
+    elif app_mode == "FLOTA (BASE)": 
+        run_base()
 
 if __name__ == "__main__":
     main_hub()
