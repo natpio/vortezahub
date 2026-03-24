@@ -104,7 +104,7 @@ def inject_vorteza_flow_ui():
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. MODUŁ ANALIZY FINANSOWEJ (Z TRYBEM TARGI)
+# 2. MODUŁ ANALIZY FINANSOWEJ (Z PEŁNĄ WALUTOWOŚCIĄ EXPO)
 # ==============================================================================
 def show_financial_analysis():
     with st.sidebar:
@@ -114,14 +114,14 @@ def show_financial_analysis():
         origin = st.selectbox("PUNKT STARTU", list(CONF["DISTANCES_AND_MYTO"].keys()))
         dest = st.selectbox("PUNKT DOCELOWY", list(CONF["DISTANCES_AND_MYTO"][origin].keys()))
         
-        # Pobranie kursu EURO
+        # Pobranie kursu EURO z config.json
         eur_rate = st.number_input("KURS EUR/PLN", value=CONF.get("EURO_RATE", 4.30), step=0.01)
         
         st.divider()
-        st.markdown("### 📈 MODEL PRZYCHODU")
+        st.markdown("### 📈 MODEL PRZYCHODU TRASY")
         c_cols = st.columns([2, 1])
         with c_cols[0]: rate_type = st.selectbox("MODEL", ["KM", "RYCZAŁT", "OPAKOWANIE"])
-        with c_cols[1]: rate_curr = st.selectbox("WALUTA", ["PLN", "EUR"])
+        with c_cols[1]: rate_curr = st.selectbox("WALUTA", ["PLN", "EUR"], key="rate_curr")
         rate_val = st.number_input(f"STAWKA ({rate_curr})", value=6.50 if rate_curr == "PLN" else 1.50)
         
         st.divider()
@@ -129,24 +129,26 @@ def show_financial_analysis():
         expo_mode = st.toggle("AKTYWUJ POSTÓJ NA TARGACH")
         if expo_mode:
             expo_days = st.number_input("LICZBA DNI POSTOJU", min_value=1, value=3)
-            expo_rate_pln = st.number_input("STAWKA ZA DOBĘ (PLN)", value=1200)
+            e_cols = st.columns([2, 1])
+            with e_cols[0]: expo_rate_val = st.number_input("STAWKA ZA DOBĘ", value=1200 if rate_curr == "PLN" else 280)
+            with e_cols[1]: expo_rate_curr = st.selectbox("WALUTA EXPO", ["PLN", "EUR"])
         else:
-            expo_days = 0
-            expo_rate_pln = 0
+            expo_days, expo_rate_val, expo_rate_curr = 0, 0, "PLN"
             
         st.divider()
         view_curr = st.radio("POKAZUJ KOSZTY W:", ["PLN", "EUR"], horizontal=True)
 
-    # Pobranie szczegółów trasy
+    # Dane trasy pobrane z config.json
     route = CONF["DISTANCES_AND_MYTO"][origin][dest]
     dPL, dEU = route["distPL"], route["distEU"]
     total_dist = dPL + dEU
 
+    # Obsługa danych pojazdu
     if source_mode == "🔗 SYNC (ZE STACK)":
         if 'v_manifest' not in st.session_state or not st.session_state.v_manifest:
             st.warning("⚠️ BRAK DANYCH W STACK."); return
         total_cases = sum(math.ceil(it['p_act'] / it.get('itemsPerCase', 1)) for it in st.session_state.v_manifest)
-        active_veh_name = st.selectbox("POJAZD", list(VEH_MAP.keys()))
+        active_veh_name = st.selectbox("POJAZD DO ANALIZY", list(VEH_MAP.keys()))
     else:
         col1, col2 = st.columns(2)
         with col1: active_veh_name = st.selectbox("TYP POJAZDU", list(VEH_MAP.keys()))
@@ -156,8 +158,8 @@ def show_financial_analysis():
     v_spec = CONF["VEHICLE_DATA"][cat]
     prices = CONF["PRICE"]
 
-    # --- OBLICZENIA PEŁNEGO KOSZTU ---
-    # 1. Paliwo (Smart Tanking - priorytet PL)
+    # --- OBLICZENIA PEŁNEGO KOSZTU (PLN) ---
+    # 1. Paliwo (Smart Tanking - priorytet PL na podstawie tankCapacity)
     total_fuel_needed = total_dist * v_spec["fuelUsage"]
     fuel_from_pl = min(total_fuel_needed, v_spec["tankCapacity"])
     fuel_from_eu = max(0, total_fuel_needed - fuel_from_pl)
@@ -166,7 +168,7 @@ def show_financial_analysis():
     # 2. AdBlue
     cost_adblue_pln = (total_dist * v_spec["adBlueUsage"] * prices["adBluePLN"])
     
-    # 3. Serwis i Amortyzacja
+    # 3. Serwis i Amortyzacja (PL vs EU)
     cost_service_pln = (dPL * v_spec["serviceCostPLN"]) + (dEU * v_spec["serviceCostEUR"] * eur_rate)
     
     # 4. Myto (Konwersja EUR z bazy na PLN)
@@ -178,19 +180,20 @@ def show_financial_analysis():
     cost_driver_road = 500 + (total_dist * 0.15)
     cost_driver_expo = expo_days * 450 # Dieta postojowa
     
-    # 6. Utrzymanie Auta (Postój Expo)
+    # 6. Utrzymanie Auta (Postój Expo - estymacja na podstawie serwisu)
     cost_vehicle_standby = expo_days * (v_spec["serviceCostPLN"] * 100)
     
     cost_expo_total_pln = cost_driver_expo + cost_vehicle_standby
     total_cost_pln = cost_fuel_pln + cost_adblue_pln + cost_service_pln + cost_tolls_pln + cost_driver_road + cost_expo_total_pln
 
-    # --- PRZYCHÓD ---
+    # --- PRZYCHÓD (PLN) ---
     revenue_road_pln = (total_dist * rate_val if rate_type == "KM" else (rate_val if rate_type == "RYCZAŁT" else total_cases * rate_val))
     if rate_curr == "EUR": revenue_road_pln *= eur_rate
     
-    revenue_expo_pln = expo_days * expo_rate_pln
-    total_revenue_pln = revenue_road_pln + revenue_expo_pln
+    revenue_expo_pln = expo_days * expo_rate_val
+    if expo_rate_curr == "EUR": revenue_expo_pln *= eur_rate
     
+    total_revenue_pln = revenue_road_pln + revenue_expo_pln
     margin_pln = total_revenue_pln - total_cost_pln
     margin_pct = (margin_pln / total_revenue_pln * 100) if total_revenue_pln > 0 else 0
 
@@ -199,8 +202,8 @@ def show_financial_analysis():
     st.markdown(f"<div class='v-badge-unit'>DYSTANS: {total_dist} KM (PL: {dPL} KM | EU: {dEU} KM) | POSTÓJ EXPO: {expo_days} DNI</div>", unsafe_allow_html=True)
     
     c1, c2, c3 = st.columns(3)
-    c1.markdown(f'<div class="v-flow-card"><div class="v-flow-label">ŁĄCZNY PRZYCHÓD</div><div class="v-flow-value-main">{total_revenue_pln:,.2f} PLN</div><div class="v-flow-value-sub">TRASA + EXPO</div></div>', unsafe_allow_html=True)
-    c2.markdown(f'<div class="v-flow-card"><div class="v-flow-label">PEŁNY KOSZT</div><div class="v-flow-value-main">{total_cost_pln:,.2f} PLN</div><div class="v-flow-value-sub">W TYM POSTÓJ: {cost_expo_total_pln:,.0f} PLN</div></div>', unsafe_allow_html=True)
+    c1.markdown(f'<div class="v-flow-card"><div class="v-flow-label">ŁĄCZNY PRZYCHÓD</div><div class="v-flow-value-main">{total_revenue_pln:,.2f} PLN</div><div class="v-flow-value-sub">{total_revenue_pln/eur_rate:,.2f} EUR</div></div>', unsafe_allow_html=True)
+    c2.markdown(f'<div class="v-flow-card"><div class="v-flow-label">PEŁNY KOSZT</div><div class="v-flow-value-main">{total_cost_pln:,.2f} PLN</div><div class="v-flow-value-sub">{total_cost_pln/eur_rate:,.2f} EUR</div></div>', unsafe_allow_html=True)
     
     m_clr = "v-positive" if margin_pln > 0 else "v-negative"
     c3.markdown(f'<div class="v-flow-card"><div class="v-flow-label">MARŻA (ZYSK)</div><div class="v-flow-value-main {m_clr}">{margin_pln:,.2f} PLN</div><div class="v-flow-value-sub {m_clr}">{margin_pct:.1f}% RENTOWNOŚCI</div></div>', unsafe_allow_html=True)
@@ -218,13 +221,13 @@ def show_financial_analysis():
         st.table(cost_df.set_index("SKŁADNIK"))
         
     with cb:
-        st.markdown("### ⛽ ANALIZA OPERACYJNA")
+        st.markdown(f"### ⛽ ANALIZA OPERACYJNA ({view_curr})")
         st.info(f"**PRÓG RENTOWNOŚCI (BEP):** {round((total_cost_pln/total_dist)*mult, 2) if total_dist > 0 else 0} {view_curr}/KM")
+        if expo_mode:
+            st.write(f"**Zysk z samych targów:** {round((revenue_expo_pln - cost_expo_total_pln)*mult, 2)} {view_curr}")
+            st.write(f"**Doba postoju kosztuje Cię:** {round((cost_expo_total_pln/max(1,expo_days))*mult, 2)} {view_curr}")
         st.write(f"**Tankowanie PL (6.40 PLN/L):** {round(fuel_from_pl, 1)} L")
         st.write(f"**Tankowanie UE (1.65 EUR/L):** {round(fuel_from_eu, 1)} L")
-        if expo_mode:
-            st.write(f"**Zysk z samych targów:** {revenue_expo_pln - cost_expo_total_pln:,.2f} PLN")
-            st.write(f"**Doba postoju kosztuje Cię:** {cost_expo_total_pln/max(1,expo_days):,.2f} PLN")
 
 # ==============================================================================
 # 3. MODUŁ EDYTORA TRAS (ROUTE MASTER)
