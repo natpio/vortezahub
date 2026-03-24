@@ -75,7 +75,7 @@ def get_vorteza_sku_hex(sku_name):
     return random.choice(palette)
 
 # ==============================================================================
-# 3. SILNIK GRAFICZNY: TRUCK PRO RENDERER
+# 3. SILNIK GRAFICZNY: TRUCK PRO RENDERER (FULL CONTOUR MODE)
 # ==============================================================================
 def build_mesh(vx, vy, vz, color, name, op=1.0):
     return go.Mesh3d(x=vx, y=vy, z=vz, i=[7,0,0,0,4,4,6,6,4,0,3,2], j=[3,4,1,2,5,6,5,2,0,1,6,3], k=[0,7,2,3,6,7,1,1,5,5,7,6], color=color, opacity=op, name=name, flatshading=True)
@@ -84,19 +84,35 @@ def render_vorteza_pro_3d(veh, stacks):
     fig = go.Figure()
     L, W, H, cab = veh['L'], veh['W'], veh['H'], veh['cab_l']
     
+    # 1. Rama i Podwozie
     fig.add_trace(build_mesh([0, L, L, 0, 0, L, L, 0], [0, 0, W, W, 0, 0, W, W], [-10, -10, -10, -10, -2, -2, -2, -2], "#B58863", "RAMA"))
     for ax in range(veh['axles']):
         pos_x = L - 380 + (ax * 135)
         for side in [-35, W+15]:
             fig.add_trace(build_mesh([pos_x-50, pos_x+50, pos_x+50, pos_x-50, pos_x-50, pos_x+50, pos_x+50, pos_x-50], [side, side, side+20, side+20, side, side, side+20, side+20], [-80, -80, -80, -80, -5, -5, -5, -5], "#000", "KOŁO"))
     
+    # 2. Kabina
     fig.add_trace(build_mesh([-cab, 0, 0, -cab, -cab, 0, 0, -cab], [-15, -15, W+15, W+15, -15, -15, W+15, W+15], [0, 0, 0, 0, H*0.95, H*0.95, H*0.95, H*0.95], "#050505", "KABINA"))
     
+    # 3. PEŁNY SZKIELET NACZEPY (12 krawędzi dla widoczności sufitu i ścian)
+    skel_lines = [
+        # Podłoga
+        ([0, L], [0, 0], [0, 0]), ([0, L], [W, W], [0, 0]), ([0, 0], [0, W], [0, 0]), ([L, L], [0, W], [0, 0]),
+        # Sufit
+        ([0, L], [0, 0], [H, H]), ([0, L], [W, W], [H, H]), ([0, 0], [0, W], [H, H]), ([L, L], [0, W], [H, H]),
+        # Słupki pionowe
+        ([0, 0], [0, 0], [0, H]), ([0, 0], [W, W], [0, H]), ([L, L], [0, 0], [0, H]), ([L, L], [W, W], [0, H])
+    ]
+    for lx, ly, lz in skel_lines:
+        fig.add_trace(go.Scatter3d(x=lx, y=ly, z=lz, mode='lines', line=dict(color='#B58863', width=5), hoverinfo='skip'))
+    
+    # 4. Ładunek (SOLID MODE - Opacity 1.0)
     for s in stacks:
         for u in s['items']:
             clr = get_vorteza_sku_hex(u['name'])
             vx, vy, vz = [s['x'], s['x']+u['w_fit'], s['x']+u['w_fit'], s['x'], s['x'], s['x']+u['w_fit'], s['x']+u['w_fit'], s['x']], [s['y'], s['y'], s['y']+u['l_fit'], s['y']+u['l_fit'], s['y'], s['y'], s['y']+u['l_fit'], s['y']+u['l_fit']], [u['z'], u['z'], u['z'], u['z'], u['z']+u['height'], u['z']+u['height'], u['z']+u['height'], u['z']+u['height']]
-            fig.add_trace(go.Mesh3d(x=vx, y=vy, z=vz, i=[7,0,0,0,4,4,6,6,4,0,3,2], j=[3,4,1,2,5,6,5,2,0,1,6,3], k=[0,7,2,3,6,7,1,1,5,5,7,6], color=clr, opacity=0.9, name=u['name']))
+            # Ustawienie opacity na 1.0
+            fig.add_trace(go.Mesh3d(x=vx, y=vy, z=vz, i=[7,0,0,0,4,4,6,6,4,0,3,2], j=[3,4,1,2,5,6,5,2,0,1,6,3], k=[0,7,2,3,6,7,1,1,5,5,7,6], color=clr, opacity=1.0, name=u['name']))
             
             lx = [vx[0], vx[1], vx[2], vx[3], vx[0], vx[4], vx[5], vx[1], vx[5], vx[6], vx[2], vx[6], vx[7], vx[3], vx[7], vx[4]]
             ly = [vy[0], vy[1], vy[2], vy[3], vy[0], vy[4], vy[5], vy[1], vy[5], vy[6], vy[2], vy[6], vy[7], vy[3], vy[7], vy[4]]
@@ -112,16 +128,13 @@ def render_vorteza_pro_3d(veh, stacks):
 class V25SpaceMaximizer:
     @staticmethod
     def solve(cargo, veh, x_off=0):
-        # Sortowanie: Piętrowalne najpierw, potem wg największej objętości
         items = sorted(cargo, key=lambda x: (not x.get('canStack', True), x['width'] * x['length'] * x['height']), reverse=True)
         stacks, weight, volume = [], 0, 0
         
-        # Mapa zajętości podłogi (uproszczony algorytm skanowania wolnych luk)
         for u in items:
             if weight + u['weight'] > veh['max_w']: continue
             
             placed = False
-            # 1. Próba piętrowania na istniejącym stosie
             for s in stacks:
                 if u.get('canStack', True) and u['width'] <= s['w'] and u['length'] <= s['l']:
                     if (s['curH'] + u['height'] <= veh['H']):
@@ -131,11 +144,8 @@ class V25SpaceMaximizer:
                         placed = True; break
             if placed: continue
             
-            # 2. Poszukiwanie "luki" na podłodze (Algorytm First-Fit na osiach X, Y)
-            # Skanujemy wzdłuż naczepy co 5cm dla precyzji, szukając wolnego prostokąta
             for x in range(x_off, veh['L'] - u['width'], 10):
                 for y in range(0, veh['W'] - u['length'], 10):
-                    # Sprawdzenie kolizji z istniejącymi stosami
                     collision = False
                     for s in stacks:
                         if not (x + u['width'] <= s['x'] or x >= s['x'] + s['w'] or 
@@ -153,7 +163,7 @@ class V25SpaceMaximizer:
         return stacks, weight, volume, ldm_occ
 
 # ==============================================================================
-# 5. GŁÓWNA FUNKCJA URUCHOMIENIOWA
+# 5. GŁÓWNA FUNKCJA URUCHOMIENIOWA (MODUŁ HUB)
 # ==============================================================================
 def run_stack():
     inject_vorteza_stack_ui()
@@ -178,7 +188,7 @@ def run_stack():
             if st.button(L['add']):
                 found = False
                 for it in st.session_state.v_manifest:
-                    if it['name'] == sel_sku: it['p_act'] += p_qty; found = True; break
+                    if item['name'] == sel_sku: it['p_act'] += p_qty; found = True; break
                 if not found:
                     u_e = p_ref.copy(); u_e['p_act'] = p_qty; st.session_state.v_manifest.append(u_e)
                 st.rerun()
@@ -201,7 +211,6 @@ def run_stack():
         for e in st.session_state.v_manifest:
             for _ in range(math.ceil(e['p_act'] / e.get('itemsPerCase', 1))): eng_in.append(e.copy())
         
-        # WYWOŁANIE NOWEGO SILNIKA V25
         stacks, weight, volume, ldm_occ = V25SpaceMaximizer.solve(eng_in, veh, x_shift)
         
         c1, c2, c3, c4, c5, c6 = st.columns(6)
