@@ -7,13 +7,13 @@ import math
 import base64
 
 # ==============================================================================
-# 0. KONFIGURACJA ŚCIEŻEK I ŁADOWANIE BAZY
+# 0. KONFIGURACJA I ZASOBY (ZGODNIE ZE STRUKTURĄ GITHUB)
 # ==============================================================================
 PATH_CONFIG = os.path.join("data", "config.json")
 PATH_BG = os.path.join("assets", "bg_vorteza.png")
 
 def load_config():
-    """Wczytuje całą konfigurację z pliku JSON."""
+    """Wczytuje parametry kosztowe, trasy i stawki z bazy danych."""
     try:
         if os.path.exists(PATH_CONFIG):
             with open(PATH_CONFIG, "r", encoding="utf-8") as f:
@@ -23,7 +23,7 @@ def load_config():
         return {}
 
 def save_config(config_data):
-    """Zapisuje zaktualizowaną konfigurację do pliku JSON."""
+    """Zapisuje zaktualizowaną bazę tras do pliku JSON."""
     with open(PATH_CONFIG, "w", encoding="utf-8") as f:
         json.dump(config_data, f, indent=4, ensure_ascii=False)
 
@@ -35,7 +35,7 @@ VEH_MAP = {
 }
 
 # ==============================================================================
-# 1. UI ENGINE: APEX FLOW STYLE (FIXED CONTRAST)
+# 1. UI ENGINE: APEX FLOW STYLE (KONTRAST I CZYTELNOŚĆ)
 # ==============================================================================
 def inject_vorteza_flow_ui():
     bg_data = ""
@@ -65,7 +65,7 @@ def inject_vorteza_flow_ui():
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. MODUŁ ANALIZY FINANSOWEJ
+# 2. MODUŁ ANALIZY FINANSOWEJ (PEŁNY KOSZT)
 # ==============================================================================
 def show_financial_analysis():
     with st.sidebar:
@@ -86,7 +86,7 @@ def show_financial_analysis():
         st.divider()
         view_curr = st.radio("POKAZUJ KOSZTY W:", ["PLN", "EUR"], horizontal=True)
 
-    # Pobranie danych trasy
+    # Pobranie danych trasy z bazy
     route = CONF["DISTANCES_AND_MYTO"][origin][dest]
     dPL, dEU = route["distPL"], route["distEU"]
     total_dist = dPL + dEU
@@ -105,16 +105,26 @@ def show_financial_analysis():
     v_spec = CONF["VEHICLE_DATA"][cat]
     prices = CONF["PRICE"]
 
-    # Obliczenia Smart Tanking (v2.0)
+    # --- OBLICZENIA PEŁNEGO KOSZTU ---
+    # 1. Paliwo (Smart Tanking - PL priorytet)
     total_fuel_needed = total_dist * v_spec["fuelUsage"]
     fuel_from_pl = min(total_fuel_needed, v_spec["tankCapacity"])
     fuel_from_eu = max(0, total_fuel_needed - fuel_from_pl)
     cost_fuel_pln = (fuel_from_pl * prices["fuelPLN"]) + (fuel_from_eu * prices["fuelEUR"] * eur_rate)
     
+    # 2. AdBlue
     cost_adblue_pln = (total_dist * v_spec["adBlueUsage"] * prices["adBluePLN"])
+    
+    # 3. Serwis i Amortyzacja
     cost_service_pln = (dPL * v_spec["serviceCostPLN"]) + (dEU * v_spec["serviceCostEUR"] * eur_rate)
+    
+    # 4. Myto (Konwersja EUR na PLN)
     cost_tolls_pln = route.get(f"myto{cat}", 0) * eur_rate
+    
+    # 5. Kierowca
     cost_driver_pln = 500 + (total_dist * 0.15)
+    
+    # SUMA PEŁNEGO KOSZTU
     total_cost_pln = cost_fuel_pln + cost_adblue_pln + cost_service_pln + cost_tolls_pln + cost_driver_pln
 
     # Przychód
@@ -125,12 +135,11 @@ def show_financial_analysis():
 
     # Dashboard Główny
     st.markdown(f"#### 📍 RELACJA: {origin.upper()} ➔ {dest.upper()}")
-    # Wyświetlanie dystansu
-    st.markdown(f"<div class='v-badge-unit'>DYSTANS CAŁKOWITY: {total_dist} KM (POLSKA: {dPL} KM | ZAGRANICA: {dEU} KM)</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='v-badge-unit'>DYSTANS: {total_dist} KM (PL: {dPL} KM | EU: {dEU} KM)</div>", unsafe_allow_html=True)
     
     c1, c2, c3 = st.columns(3)
     c1.markdown(f'<div class="v-flow-card"><div class="v-flow-label">PRZYCHÓD NETTO</div><div class="v-flow-value-main">{revenue_pln:,.2f} PLN</div><div class="v-flow-value-sub">{revenue_pln/eur_rate:,.2f} EUR</div></div>', unsafe_allow_html=True)
-    c2.markdown(f'<div class="v-flow-card"><div class="v-flow-label">KOSZT CAŁKOWITY</div><div class="v-flow-value-main">{total_cost_pln:,.2f} PLN</div><div class="v-flow-value-sub">{total_cost_pln/eur_rate:,.2f} EUR</div></div>', unsafe_allow_html=True)
+    c2.markdown(f'<div class="v-flow-card"><div class="v-flow-label">PEŁNY KOSZT</div><div class="v-flow-value-main">{total_cost_pln:,.2f} PLN</div><div class="v-flow-value-sub">{total_cost_pln/eur_rate:,.2f} EUR</div></div>', unsafe_allow_html=True)
     
     m_clr = "v-positive" if margin_pln > 0 else "v-negative"
     c3.markdown(f'<div class="v-flow-card"><div class="v-flow-label">MARŻA (ZYSK)</div><div class="v-flow-value-main {m_clr}">{margin_pln:,.2f} PLN</div><div class="v-flow-value-sub {m_clr}">{margin_pct:.1f}% RENTOWNOŚCI</div></div>', unsafe_allow_html=True)
@@ -152,13 +161,12 @@ def show_financial_analysis():
         st.write(f"**Tankowanie UE:** {round(fuel_from_eu, 1)} L")
 
 # ==============================================================================
-# 3. MODUŁ EDYTORA TRAS
+# 3. MODUŁ EDYTORA TRAS (ROUTE MASTER)
 # ==============================================================================
 def show_route_editor():
     st.markdown("### 🗺️ EDYTOR BAZY TRAS I OPŁAT")
-    st.write("Wprowadź zmiany w tabeli poniżej. Możesz edytować istniejące trasy lub dodać nowe wiersze na końcu.")
+    st.write("Wprowadź zmiany w tabeli. Możesz edytować kilometry oraz stawki myta (w EURO).")
     
-    # Przekształcenie zagnieżdżonego słownika w płaską listę dla edytora
     flat_routes = []
     for origin, destinations in CONF["DISTANCES_AND_MYTO"].items():
         for dest, data in destinations.items():
@@ -172,24 +180,20 @@ def show_route_editor():
     edited_df = st.data_editor(df_routes, num_rows="dynamic", use_container_width=True, key="route_editor")
     
     if st.button("💾 ZAPISZ ZMIANY W BAZIE"):
-        # Re-budowa struktury zagnieżdżonej z edytowanego DataFrame
         new_distances = {}
         for _, row in edited_df.iterrows():
-            orig = row["SKĄD"]
-            dest = row["DOKĄD"]
+            orig, d = row["SKĄD"], row["DOKĄD"]
             if orig not in new_distances: new_distances[orig] = {}
-            new_distances[orig][dest] = {
+            new_distances[orig][d] = {
                 "distPL": int(row["KM POLSKA"]), "distEU": int(row["KM ZAGRANICA"]),
                 "mytoFTL": float(row["MYTO FTL (EUR)"]), "mytoSolo": float(row["MYTO SOLO (EUR)"]), "mytoBus": float(row["MYTO BUS (EUR)"])
             }
-        
         CONF["DISTANCES_AND_MYTO"] = new_distances
         save_config(CONF)
-        st.success("Baza tras została pomyślnie zaktualizowana!")
-        st.rerun()
+        st.success("Baza została zaktualizowana!"); st.rerun()
 
 # ==============================================================================
-# 4. GŁÓWNA FUNKCJA FLOW
+# 4. PUNKT WEJŚCIA MODUŁU
 # ==============================================================================
 def run_flow():
     inject_vorteza_flow_ui()
@@ -198,7 +202,6 @@ def run_flow():
     if not CONF:
         st.error("Baza danych nie została załadowana."); return
 
-    # Nawigacja między trybami
     with st.sidebar:
         st.markdown("### 🕹️ TRYB PRACY")
         app_mode = st.radio("WYBIERZ:", ["🛰️ ANALIZA FINANSOWA", "🗺️ EDYTOR TRAS"], label_visibility="collapsed")
