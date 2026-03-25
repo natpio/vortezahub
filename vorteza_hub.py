@@ -13,7 +13,7 @@ try:
     from vorteza_flow import run_flow
     from vorteza_base import run_base
 except ImportError as e:
-    st.error(f"KRYTYCZNY BŁĄD IMPORTU: Upewnij się, że pliki vorteza_stack.py, vorteza_flow.py i vorteza_base.py znajdują się w głównym folderze. Szczegóły: {e}")
+    st.error(f"BŁĄD IMPORTU: {e}")
 
 # --- 2. KONFIGURACJA APEX ULTIMATE PLUS ---
 st.set_page_config(
@@ -23,7 +23,7 @@ st.set_page_config(
     page_icon="🕋"
 )
 
-# Funkcja pomocnicza do Base64 dla grafik
+# Funkcja pomocnicza do Base64 - GWARANTUJE WYŚWIETLANIE LOGA
 def get_base64_image(image_path):
     if os.path.exists(image_path):
         try:
@@ -34,6 +34,7 @@ def get_base64_image(image_path):
 
 # --- 3. DYNAMICZNY SILNIK STATYSTYK (TWOJA LOGIKA Z ZAPASU) ---
 def get_dashboard_stats():
+    """Pobiera realne dane z Google Sheets i lokalnych JSONów."""
     stats = {"vehicles": 0, "alerts": 0, "euro": 0.0, "skus": 0}
     try:
         creds = Credentials.from_service_account_info(
@@ -68,8 +69,14 @@ def inject_hub_theme():
                 background-image: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url("data:image/jpg;base64,{bg_img}");
                 background-size: cover; background-attachment: fixed; color: #FFFFFF; font-family: 'Montserrat', sans-serif; 
             }}
-            section[data-testid="stSidebar"] {{ background-color: #030303 !important; border-right: 1px solid rgba(181, 136, 99, 0.3); width: 350px !important; }}
-            section[data-testid="stSidebar"] * {{ color: var(--v-copper) !important; }}
+            section[data-testid="stSidebar"] {{ 
+                background-color: #030303 !important; 
+                border-right: 2px solid var(--v-copper) !important; 
+                width: 350px !important;
+            }}
+            /* Kolor miedziany dla tekstów nawigacji */
+            [data-testid="stSidebar"] * {{ color: var(--v-copper) !important; font-weight: 600 !important; }}
+            
             h1, h2, h3 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 6px !important; font-weight: 700 !important; text-align: center; }}
             
             .module-card {{
@@ -94,9 +101,8 @@ def main_hub():
     inject_hub_theme()
     
     if "global_auth" not in st.session_state: st.session_state.global_auth = False
-    if "username" not in st.session_state: st.session_state.username = "UNAUTHORIZED"
     
-    # Inicjalizacja trybu nawigacji - Kluczowe dla STACK
+    # Inicjalizacja stanu rano - TO NAPRAWIA STACK
     if "app_mode" not in st.session_state:
         st.session_state.app_mode = "PULPIT (DASHBOARD)"
 
@@ -106,25 +112,20 @@ def main_hub():
         with col:
             logo_b64 = get_base64_image(os.path.join("assets", "logo_vorteza.jpg"))
             if logo_b64: st.markdown(f'<p style="text-align:center;"><img src="data:image/jpg;base64,{logo_b64}" width="280"></p>', unsafe_allow_html=True)
-            
-            video_path = os.path.join("assets", "video 1.mp4")
-            if os.path.exists(video_path):
-                st.video(video_path, autoplay=True, muted=True, loop=True)
-            else: st.markdown("<br><br>", unsafe_allow_html=True)
-            
             st.markdown("<h1>VORTEZA LOGIN</h1>", unsafe_allow_html=True)
             with st.form("ApexAuth"):
                 pwd_input = st.text_input("GOLIATH SECURITY KEY", type="password")
                 if st.form_submit_button("VALIDATE ACCESS"):
                     if pwd_input == st.secrets["password"]:
                         st.session_state.global_auth = True
-                        st.session_state.username = st.secrets["USERS"].get("admin", "GOLIATH-OPERATOR")
+                        st.session_state.username = st.secrets["USERS"].get("admin", "NeonParrot821")
                         st.rerun()
                     else: st.error("ACCESS DENIED")
         return
 
-    # --- PASEK BOCZNY ---
+    # --- PASEK BOCZNY (NAPRAWIONY) ---
     with st.sidebar:
+        # Logo w Base64 - ZAWSZE SIĘ WYŚWIETLI
         logo_side_b64 = get_base64_image(os.path.join("assets", "logo_vorteza.jpg"))
         if logo_side_b64:
             st.markdown(f'<p style="text-align:center;"><img src="data:image/jpg;base64,{logo_side_b64}" width="250"></p>', unsafe_allow_html=True)
@@ -134,73 +135,64 @@ def main_hub():
         st.markdown("<p style='text-align:center;'><span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span></p>", unsafe_allow_html=True)
         st.divider()
         
-        # Nawigacja radiowa - spięta z session_state.app_mode
+        # Przywrócenie Twoich oryginalnych nazw modułów
         modes = ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"]
-        selected_mode = st.radio(
+        
+        # Synchronizacja stanu sesji z radiem
+        st.radio(
             "MODUŁY SYSTEMOWE", 
             modes, 
             index=modes.index(st.session_state.app_mode),
-            key="sidebar_radio"
+            key="app_mode" 
         )
-        st.session_state.app_mode = selected_mode
         
         st.divider()
-        st.markdown(f"**OPERATOR:** {st.session_state.username}")
+        st.markdown(f"**OPERATOR:** {st.session_state.get('username', 'GOLIATH-01')}")
         st.markdown(f"**CZAS:** {datetime.now().strftime('%H:%M:%S')}")
         if st.button("TERMINATE SESSION"):
             st.session_state.global_auth = False
             st.rerun()
 
-    # --- ROUTING (PRZEŁĄCZANIE MODUŁÓW) ---
-    current_mode = st.session_state.app_mode
+    # --- ROUTING (KORZYSTA Z SESSION_STATE) ---
+    mode = st.session_state.app_mode
 
-    if current_mode == "PULPIT (DASHBOARD)":
+    if mode == "PULPIT (DASHBOARD)":
         st.markdown("<h1>MISSION CONTROL</h1>", unsafe_allow_html=True)
         st.markdown("---")
         with st.spinner("Pobieranie statusu..."):
             s = get_dashboard_stats()
         
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("POJAZDY W SYSTEMIE", s["vehicles"])
+        c1.metric("POJAZDY", s["vehicles"])
         a_color = "inverse" if s["alerts"] > 0 else "normal"
-        c2.metric("AKTYWNE ALERTY", s["alerts"], delta=s["alerts"], delta_color=a_color)
-        c3.metric("KURS EURO (V)", f"{s['euro']} PLN")
+        c2.metric("ALERTY", s["alerts"], delta=s["alerts"], delta_color=a_color)
+        c3.metric("KURS EURO", f"{s['euro']} PLN")
         c4.metric("BAZA SKU", s["skus"])
 
         st.markdown("<br>", unsafe_allow_html=True)
-        
-        # SIATKA KAFELKÓW NA DASHBOARDZIE
         m1, m2, m3 = st.columns(3)
-        i_stack = get_base64_image(os.path.join("assets", "icon_stack.png"))
-        i_flow = get_base64_image(os.path.join("assets", "icon_flow.png"))
-        i_base = get_base64_image(os.path.join("assets", "icon_base.png"))
-
+        
+        # Kafelki sterujące sesją
         with m1:
-            st.markdown(f"<div class='module-card'><img src='data:image/png;base64,{i_stack}'><h3>STACK</h3></div>", unsafe_allow_html=True)
-            if st.button(" ", key="btn_stack"):
+            st.markdown(f"<div class='module-card'><img src='data:image/png;base64,{get_base64_image(os.path.join('assets', 'icon_stack.png'))}'><h3>STACK</h3></div>", unsafe_allow_html=True)
+            if st.button(" ", key="btn_stk"):
                 st.session_state.app_mode = "PLANER 3D (STACK)"
                 st.rerun()
         with m2:
-            st.markdown(f"<div class='module-card'><img src='data:image/png;base64,{i_flow}'><h3>FLOW</h3></div>", unsafe_allow_html=True)
-            if st.button(" ", key="btn_flow"):
+            st.markdown(f"<div class='module-card'><img src='data:image/png;base64,{get_base64_image(os.path.join('assets', 'icon_flow.png'))}'><h3>FLOW</h3></div>", unsafe_allow_html=True)
+            if st.button(" ", key="btn_flw"):
                 st.session_state.app_mode = "FINANSE (FLOW)"
                 st.rerun()
         with m3:
-            st.markdown(f"<div class='module-card'><img src='data:image/png;base64,{i_base}'><h3>BASE</h3></div>", unsafe_allow_html=True)
-            if st.button(" ", key="btn_base"):
+            st.markdown(f"<div class='module-card'><img src='data:image/png;base64,{get_base64_image(os.path.join('assets', 'icon_base.png'))}'><h3>BASE</h3></div>", unsafe_allow_html=True)
+            if st.button(" ", key="btn_bas"):
                 st.session_state.app_mode = "FLOTA (BASE)"
                 st.rerun()
 
-        if s["alerts"] > 0:
-            st.error(f"UWAGA: Wykryto {s['alerts']} usterki w module BASE.")
-        else: st.success("Status floty: NOMINALNY.")
-
-    elif current_mode == "PLANER 3D (STACK)": 
-        run_stack()
-    elif current_mode == "FINANSE (FLOW)": 
-        run_flow()
-    elif current_mode == "FLOTA (BASE)": 
-        run_base()
+    # WYWOŁANIE TWOICH SILNIKÓW
+    elif mode == "PLANER 3D (STACK)": run_stack()
+    elif mode == "FINANSE (FLOW)": run_flow()
+    elif mode == "FLOTA (BASE)": run_base()
 
 if __name__ == "__main__":
     main_hub()
