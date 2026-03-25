@@ -23,15 +23,25 @@ st.set_page_config(
     page_icon="🕋"
 )
 
+# Funkcja pomocnicza do konwersji obrazu na base64
 def get_base64_image(image_path):
     if os.path.exists(image_path):
         with open(image_path, "rb") as img_file:
             return base64.b64encode(img_file.read()).decode()
     return None
 
+# --- 3. DYNAMICZNY SILNIK STATYSTYK ---
 def get_dashboard_stats():
-    # ... (logika pobierania statystyk bez zmian) ...
-    return {"vehicles": 12, "alerts": 1, "euro": 4.32, "skus": 145}
+    """Pobiera dane dla Dashboardu."""
+    stats = {"vehicles": 0, "alerts": 0, "euro": 0.0, "skus": 0}
+    try:
+        # Przykładowe statystyki (symulacja danych z Google Sheets/JSON)
+        stats["vehicles"] = 24
+        stats["alerts"] = 1
+        stats["euro"] = 4.35
+        stats["skus"] = 158
+    except: pass
+    return stats
 
 # --- 4. SILNIK WIZUALNY VORTEZA ---
 def inject_hub_theme():
@@ -49,31 +59,38 @@ def inject_hub_theme():
                     background-size: cover; background-attachment: fixed; color: #FFFFFF; font-family: 'Montserrat', sans-serif; 
                 }}
                 
-                section[data-testid="stSidebar"] {{ background-color: rgba(3, 3, 3, 0.9) !important; border-right: 2px solid var(--v-copper); width: 350px !important; }}
-                section[data-testid="stSidebar"] *, section[data-testid="stSidebar"] label, section[data-testid="stSidebar"] p {{ color: var(--v-copper) !important; }}
+                /* STYLIZACJA PASKA BOCZNEGO (MIEDZIANA CZCIONKA) */
+                section[data-testid="stSidebar"] {{ 
+                    background-color: rgba(3, 3, 3, 0.95) !important; 
+                    border-right: 2px solid var(--v-copper); 
+                    width: 350px !important; 
+                }}
+                section[data-testid="stSidebar"] * {{ color: var(--v-copper) !important; }}
+                section[data-testid="stSidebar"] label p {{ font-size: 1.1rem !important; font-weight: bold; }}
 
                 .v-status-glow {{ color: #00FF41; text-shadow: 0 0 10px #00FF41; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }}
-                h1, h2, h3 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 6px !important; font-weight: 700 !important; }}
+                h1, h2, h3 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 4px !important; font-weight: 700 !important; }}
                 
-                /* Styl kart modułów na Dashboardzie */
+                /* KARTY MODUŁÓW */
                 .module-card {{
-                    background: rgba(20, 20, 20, 0.6);
+                    background: rgba(10, 10, 10, 0.7);
                     border: 1px solid var(--v-copper);
                     border-radius: 15px;
-                    padding: 25px;
+                    padding: 20px;
                     text-align: center;
-                    transition: 0.3s;
-                    height: 100%;
+                    transition: 0.4s;
+                    min-height: 380px;
                 }}
                 .module-card:hover {{
-                    background: rgba(181, 136, 99, 0.1);
-                    transform: translateY(-5px);
-                    box-shadow: 0 10px 20px rgba(181, 136, 99, 0.2);
+                    background: rgba(181, 136, 99, 0.15);
+                    transform: translateY(-10px);
+                    box-shadow: 0 15px 30px rgba(181, 136, 99, 0.3);
                 }}
 
                 .stButton>button {{ 
                     background-color: transparent !important; color: var(--v-copper) !important; 
                     border: 1px solid var(--v-copper) !important; width: 100%; transition: 0.4s; font-weight: bold;
+                    text-transform: uppercase;
                 }}
                 .stButton>button:hover {{ background-color: var(--v-copper) !important; color: black !important; }}
             </style>
@@ -83,20 +100,23 @@ def inject_hub_theme():
 def main_hub():
     inject_hub_theme()
     
-    # Inicjalizacja stanu nawigacji
     if "app_mode" not in st.session_state:
         st.session_state.app_mode = "PULPIT (DASHBOARD)"
     if "global_auth" not in st.session_state: 
         st.session_state.global_auth = False
 
-    # --- LOGOWANIE (Bez zmian) ---
+    # --- EKRAN LOGOWANIA ---
     if not st.session_state.global_auth:
-        # ... (kod logowania z poprzedniej wersji) ...
-        # Po poprawnym hasle: st.session_state.global_auth = True; st.rerun()
         _, col, _ = st.columns([0.8, 2, 0.8])
         with col:
+            st.markdown("<br><br>", unsafe_allow_html=True)
             logo_path = os.path.join("assets", "logo_vorteza.jpg")
-            if os.path.exists(logo_path): st.image(logo_path, width=250)
+            if os.path.exists(logo_path): st.image(logo_path, width=280)
+
+            video_path = os.path.join("assets", "video 1.mp4")
+            if os.path.exists(video_path):
+                st.video(video_path, autoplay=True, muted=True, loop=False)
+            
             st.markdown("<h1 style='text-align:center;'>VORTEZA LOGIN</h1>", unsafe_allow_html=True)
             with st.form("ApexAuth"):
                 pwd_input = st.text_input("GOLIATH SECURITY KEY", type="password")
@@ -104,6 +124,7 @@ def main_hub():
                     if pwd_input == st.secrets["password"]:
                         st.session_state.global_auth = True
                         st.rerun()
+                    else: st.error("ACCESS DENIED")
         return
 
     # --- PASEK BOCZNY ---
@@ -111,12 +132,14 @@ def main_hub():
         logo_path = os.path.join("assets", "logo_vorteza.jpg")
         if os.path.exists(logo_path): st.image(logo_path, use_column_width=True)
         st.markdown("<h2 style='text-align:center;'>VORTEZA</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center;'><span class='v-status-glow'>● SYSTEM ONLINE</span></p>", unsafe_allow_html=True)
         
-        # Nawigacja powiązana z session_state
         modes = ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"]
-        st.session_state.app_mode = st.radio("MODUŁY SYSTEMOWE", modes, index=modes.index(st.session_state.app_mode))
+        st.session_state.app_mode = st.radio("NAWIGACJA", modes, index=modes.index(st.session_state.app_mode))
         
         st.divider()
+        st.markdown(f"**OPERATOR:** {st.secrets['USERS'].get('admin', 'GOLIATH-01')}")
+        st.markdown(f"**DATA:** {datetime.now().strftime('%d/%m/%Y')}")
         if st.button("TERMINATE SESSION"):
             st.session_state.global_auth = False
             st.rerun()
@@ -125,41 +148,52 @@ def main_hub():
     if st.session_state.app_mode == "PULPIT (DASHBOARD)":
         banner_path = os.path.join("assets", "baner 1.jpg")
         if os.path.exists(banner_path):
-            _, mid_col, _ = st.columns([1, 2, 1])
+            _, mid_col, _ = st.columns([1, 1.8, 1])
             with mid_col: st.image(banner_path, use_column_width=True)
             
         st.markdown("<h1 style='text-align:center;'>MISSION CONTROL</h1>", unsafe_allow_html=True)
         
-        # STATYSTYKI
         s = get_dashboard_stats()
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("POJAZDY", s["vehicles"])
-        c2.metric("ALERTY", s["alerts"], delta=s["alerts"], delta_color="inverse")
-        c3.metric("EURO", f"{s['euro']} PLN")
-        c4.metric("SKU", s["skus"])
+        c2.metric("AKTYWNE ALERTY", s["alerts"], delta=s["alerts"], delta_color="inverse")
+        c3.metric("KURS EUR", f"{s['euro']} PLN")
+        c4.metric("BAZA SKU", s["skus"])
 
-        st.markdown("<br><h3 style='text-align:center;'>MODULAR ACCESS</h3>", unsafe_allow_html=True)
+        st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # SIATKA MODUŁÓW (INTERAKTYWNA NAWIGACJA)
+        # SIATKA MODUŁÓW Z NOWYMI IKONAMI
         m1, m2, m3 = st.columns(3)
         
         with m1:
-            st.markdown("""<div class='module-card'><h3>📦 STACK</h3><p>Optymalizacja załadunku 3D i rozmieszczenia towaru.</p></div>""", unsafe_allow_html=True)
+            st.markdown("<div class='module-card'>", unsafe_allow_html=True)
+            icon_s = os.path.join("assets", "icon_stack.png")
+            if os.path.exists(icon_s): st.image(icon_s, use_column_width=True)
+            st.markdown("<h3>📦 STACK</h3><p>Optymalizacja załadunku 3D.</p>", unsafe_allow_html=True)
             if st.button("LAUNCH STACK"):
                 st.session_state.app_mode = "PLANER 3D (STACK)"
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
         
         with m2:
-            st.markdown("""<div class='module-card'><h3>💰 FLOW</h3><p>Analiza rentowności tras i automatyczne oferty PDF.</p></div>""", unsafe_allow_html=True)
+            st.markdown("<div class='module-card'>", unsafe_allow_html=True)
+            icon_f = os.path.join("assets", "icon_flow.png")
+            if os.path.exists(icon_f): st.image(icon_f, use_column_width=True)
+            st.markdown("<h3>💰 FLOW</h3><p>Rentowność i oferty PDF.</p>", unsafe_allow_html=True)
             if st.button("LAUNCH FLOW"):
                 st.session_state.app_mode = "FINANSE (FLOW)"
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
                 
         with m3:
-            st.markdown("""<div class='module-card'><h3>🚛 BASE</h3><p>Zarządzanie flotą, przeglądy i statusy kierowców.</p></div>""", unsafe_allow_html=True)
+            st.markdown("<div class='module-card'>", unsafe_allow_html=True)
+            icon_b = os.path.join("assets", "icon_base.png")
+            if os.path.exists(icon_b): st.image(icon_b, use_column_width=True)
+            st.markdown("<h3>🚛 BASE</h3><p>Zarządzanie flotą VORTEZA.</p>", unsafe_allow_html=True)
             if st.button("LAUNCH BASE"):
                 st.session_state.app_mode = "FLOTA (BASE)"
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.app_mode == "PLANER 3D (STACK)": run_stack()
     elif st.session_state.app_mode == "FINANSE (FLOW)": run_flow()
