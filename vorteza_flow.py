@@ -132,7 +132,6 @@ def show_financial_analysis():
         st.divider()
         st.markdown("### 📈 MODEL PRZYCHODU TRASY")
         
-        # --- PARSOWANIE STAWKI Z CORE (SMART DEFAULT) ---
         core_rate_raw = str(st.session_state.get("flow_rate", ""))
         core_rate_val = 0.0
         core_rate_curr = "PLN"
@@ -146,7 +145,7 @@ def show_financial_analysis():
                     core_rate_val = float(match.group(0).replace(',', '.'))
             except: pass
 
-        default_model_idx = 1 if core_rate_val > 0 else 0 # 1 to RYCZAŁT
+        default_model_idx = 1 if core_rate_val > 0 else 0
         default_curr_idx = 1 if core_rate_curr == "EUR" else 0
         
         c_cols = st.columns([2, 1])
@@ -170,20 +169,30 @@ def show_financial_analysis():
         st.divider()
         view_curr = st.radio("POKAZUJ KOSZTY W:", ["PLN", "EUR"], horizontal=True)
 
-    # Dane trasy pobrane z config.json
     route = CONF["DISTANCES_AND_MYTO"][origin][dest]
     dPL, dEU = route["distPL"], route["distEU"]
     total_dist = dPL + dEU
 
-    # Obsługa danych pojazdu
+    # --- ODCZYTANIE ZAPAMIĘTANEGO POJAZDU ZE STACKA ---
     if source_mode == "🔗 SYNC (ZE STACK)":
         if 'v_manifest' not in st.session_state or not st.session_state.v_manifest:
             st.warning("⚠️ BRAK DANYCH W STACK. ZMIEŃ ŹRÓDŁO DANYCH NA 'MANUAL' LUB ZBUDUJ MANIFEST."); return
         total_cases = sum(math.ceil(it['p_act'] / it.get('itemsPerCase', 1)) for it in st.session_state.v_manifest)
-        active_veh_name = st.selectbox("POJAZD DO ANALIZY", list(VEH_MAP.keys()))
+        
+        # Pobranie pojazdu zapisanego w sesji (jeśli istnieje)
+        stack_veh = st.session_state.get("stack_selected_veh", "")
+        veh_list = list(VEH_MAP.keys())
+        idx_veh = veh_list.index(stack_veh) if stack_veh in veh_list else 0
+        
+        active_veh_name = st.selectbox("POJAZD DO ANALIZY", veh_list, index=idx_veh)
     else:
         col1, col2 = st.columns(2)
-        with col1: active_veh_name = st.selectbox("TYP POJAZDU", list(VEH_MAP.keys()))
+        with col1: 
+            stack_veh = st.session_state.get("stack_selected_veh", "")
+            veh_list = list(VEH_MAP.keys())
+            idx_veh = veh_list.index(stack_veh) if stack_veh in veh_list else 0
+            
+            active_veh_name = st.selectbox("TYP POJAZDU", veh_list, index=idx_veh)
         with col2: total_cases = st.number_input("OPAKOWANIA", min_value=1, value=12)
 
     cat = VEH_MAP[active_veh_name]
@@ -191,28 +200,21 @@ def show_financial_analysis():
     prices = CONF["PRICE"]
 
     # --- OBLICZENIA PEŁNEGO KOSZTU (PLN) ---
-    # 1. Paliwo (Smart Tanking - priorytet PL na podstawie tankCapacity)
     total_fuel_needed = total_dist * v_spec["fuelUsage"]
     fuel_from_pl = min(total_fuel_needed, v_spec["tankCapacity"])
     fuel_from_eu = max(0, total_fuel_needed - fuel_from_pl)
     cost_fuel_pln = (fuel_from_pl * prices["fuelPLN"]) + (fuel_from_eu * prices["fuelEUR"] * eur_rate)
     
-    # 2. AdBlue
     cost_adblue_pln = (total_dist * v_spec["adBlueUsage"] * prices["adBluePLN"])
-    
-    # 3. Serwis i Amortyzacja (PL vs EU)
     cost_service_pln = (dPL * v_spec["serviceCostPLN"]) + (dEU * v_spec["serviceCostEUR"] * eur_rate)
     
-    # 4. Myto (Konwersja EUR z bazy na PLN)
     myto_key = f"myto{cat}"
     cost_tolls_eur = route.get(myto_key, 0)
     cost_tolls_pln = cost_tolls_eur * eur_rate
     
-    # 5. Koszty Kierowcy (Trasa + Postój Expo)
     cost_driver_road = 500 + (total_dist * 0.15)
-    cost_driver_expo = expo_days * 450 # Dieta postojowa
+    cost_driver_expo = expo_days * 450 
     
-    # 6. Utrzymanie Auta (Postój Expo - estymacja na podstawie serwisu)
     cost_vehicle_standby = expo_days * (v_spec["serviceCostPLN"] * 100)
     
     cost_expo_total_pln = cost_driver_expo + cost_vehicle_standby
