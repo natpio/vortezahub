@@ -23,7 +23,7 @@ st.set_page_config(
     page_icon="🕋"
 )
 
-# Funkcja do Base64 dla stabilnych grafik
+# Funkcja pomocnicza do Base64 dla grafik
 def get_base64_image(image_path):
     if os.path.exists(image_path):
         try:
@@ -57,7 +57,7 @@ def get_dashboard_stats():
     except: pass
     return stats
 
-# --- 4. SILNIK WIZUALNY VORTEZA (FIX DLA NAPISÓW PIONOWYCH) ---
+# --- 4. SILNIK WIZUALNY VORTEZA ---
 def inject_hub_theme():
     bg_img = get_base64_image(os.path.join("assets", "tlo_hub_2.jpg"))
     st.markdown(f"""
@@ -70,31 +70,23 @@ def inject_hub_theme():
                 background-size: cover; background-attachment: fixed; color: #FFFFFF; font-family: 'Montserrat', sans-serif; 
             }}
             
-            /* POPRAWKA PASKA BOCZNEGO */
             section[data-testid="stSidebar"] {{ 
                 background-color: #030303 !important; 
                 border-right: 2px solid var(--v-copper);
                 min-width: 300px !important;
             }}
             
-            /* Fix dla nakładających się i pionowych napisów  */
+            /* Fix dla napisów w sidebarze */
             [data-testid="stSidebar"] .stRadio label p {{
                 color: var(--v-copper) !important;
                 font-weight: 600 !important;
                 font-size: 1.1rem !important;
-                line-height: 1.5 !important;
-                display: block !important;
-                white-space: normal !important;
-            }}
-            
-            /* Odstępy między opcjami w menu [cite: 13] */
-            [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {{
-                gap: 15px !important;
+                white-space: nowrap !important;
             }}
 
             h1, h2, h3 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 4px !important; font-weight: 700 !important; text-align: center; }}
             
-            /* DESIGN KAFELKÓW DASHBOARDU */
+            /* Karty Dashboardu */
             .module-card {{
                 background: rgba(10, 10, 10, 0.9); border: 2px solid var(--v-copper); border-radius: 15px;
                 padding: 40px 10px; height: 280px; display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -103,7 +95,7 @@ def inject_hub_theme():
             .module-card:hover {{ background: rgba(181, 136, 99, 0.2); transform: translateY(-5px); box-shadow: 0 10px 30px rgba(181, 136, 99, 0.4); }}
             .module-card img {{ width: 120px; margin-bottom: 20px; }}
             
-            /* Klikalna powierzchnia kafelka */
+            /* Przycisk na całą kartę */
             .stButton button {{
                 position: absolute; top: 0; left: 0; width: 100%; height: 280px;
                 background: transparent !important; border: none !important; color: transparent !important; z-index: 10; cursor: pointer;
@@ -118,25 +110,31 @@ def inject_hub_theme():
 def main_hub():
     inject_hub_theme()
     
+    # Inicjalizacja sesji (Identycznie jak w Twoim zapasie)
     if "global_auth" not in st.session_state: st.session_state.global_auth = False
-    
-    # Inicjalizacja stanu dla STACK
+    if "username" not in st.session_state: st.session_state.username = "UNAUTHORIZED"
     if "app_mode" not in st.session_state:
         st.session_state.app_mode = "PULPIT (DASHBOARD)"
 
-    # --- LOGOWANIE ---
+    # --- EKRAN LOGOWANIA ---
     if not st.session_state.global_auth:
         _, col, _ = st.columns([0.8, 2, 0.8])
         with col:
             logo_b64 = get_base64_image(os.path.join("assets", "logo_vorteza.jpg"))
             if logo_b64: st.markdown(f'<p style="text-align:center;"><img src="data:image/jpg;base64,{logo_b64}" width="280"></p>', unsafe_allow_html=True)
+            
+            video_path = os.path.join("assets", "video 1.mp4")
+            if os.path.exists(video_path):
+                st.video(video_path, autoplay=True, muted=True, loop=True)
+            else: st.markdown("<br><br>", unsafe_allow_html=True)
+            
             st.markdown("<h1>VORTEZA LOGIN</h1>", unsafe_allow_html=True)
             with st.form("ApexAuth"):
                 pwd_input = st.text_input("GOLIATH SECURITY KEY", type="password")
                 if st.form_submit_button("VALIDATE ACCESS"):
                     if pwd_input == st.secrets["password"]:
                         st.session_state.global_auth = True
-                        st.session_state.username = st.secrets["USERS"].get("admin", "GOLIATH-OPERATOR")
+                        st.session_state.username = st.secrets["USERS"].get("admin", "NeonParrot821")
                         st.rerun()
                     else: st.error("ACCESS DENIED")
         return
@@ -145,23 +143,20 @@ def main_hub():
     with st.sidebar:
         logo_side_b64 = get_base64_image(os.path.join("assets", "logo_vorteza.jpg"))
         if logo_side_b64:
-            st.markdown(f'<div style="text-align: center; margin-bottom: 20px;"><img src="data:image/jpg;base64,{logo_side_b64}" width="220"></div>', unsafe_allow_html=True)
+            st.markdown(f'<p style="text-align:center;"><img src="data:image/jpg;base64,{logo_side_b64}" width="250"></p>', unsafe_allow_html=True)
+        else:
+            st.markdown("<h2 style='letter-spacing:10px;'>VORTEZA</h2>", unsafe_allow_html=True)
             
         st.markdown("<p style='text-align:center;'><span class='v-status-glow'>● SYSTEM ONLINE</span></p>", unsafe_allow_html=True)
         st.divider()
         
+        # Nawigacja - używamy key="app_mode" by spiąć ją z sesją
         modes = ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"]
-        
-        # Nawigacja radiowa - spięta z app_mode 
-        st.session_state.app_mode = st.radio(
-            "MODUŁY SYSTEMOWE", 
-            modes, 
-            index=modes.index(st.session_state.app_mode)
-        )
+        st.radio("MODUŁY SYSTEMOWE", modes, key="app_mode")
         
         st.divider()
-        st.markdown(f"**OPERATOR:** {st.session_state.get('username', 'OPERATOR')}")
-        st.markdown(f"**CZAS:** {datetime.now().strftime('%H:%M:%S')}")
+        st.markdown(f"**OPERATOR:** {st.session_state.username}")
+        st.markdown(f"**DATA:** {datetime.now().strftime('%d/%m/%Y')}")
         if st.button("TERMINATE SESSION"):
             st.session_state.global_auth = False
             st.rerun()
@@ -170,16 +165,21 @@ def main_hub():
     mode = st.session_state.app_mode
 
     if mode == "PULPIT (DASHBOARD)":
+        banner_path = os.path.join("assets", "baner 1.jpg")
+        if os.path.exists(banner_path):
+            _, mid_col, _ = st.columns([1, 1.8, 1])
+            with mid_col: st.image(banner_path, use_column_width=True)
+            
         st.markdown("<h1>MISSION CONTROL</h1>", unsafe_allow_html=True)
         st.markdown("---")
         with st.spinner("Pobieranie statusu..."):
             s = get_dashboard_stats()
         
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("POJAZDY", s["vehicles"])
+        c1.metric("POJAZDY W SYSTEMIE", s["vehicles"])
         a_color = "inverse" if s["alerts"] > 0 else "normal"
-        c2.metric("ALERTY", s["alerts"], delta=s["alerts"], delta_color=a_color)
-        c3.metric("KURS EURO", f"{s['euro']} PLN")
+        c2.metric("AKTYWNE ALERTY", s["alerts"], delta=s["alerts"], delta_color=a_color)
+        c3.metric("KURS EURO (V)", f"{s['euro']} PLN")
         c4.metric("BAZA SKU", s["skus"])
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -205,13 +205,12 @@ def main_hub():
                 st.session_state.app_mode = "FLOTA (BASE)"
                 st.rerun()
 
-        if s["alerts"] > 0:
-            st.error(f"UWAGA: Wykryto {s['alerts']} usterki w module BASE.")
-        else: st.success("Status floty: NOMINALNY.")
-
-    elif mode == "PLANER 3D (STACK)": run_stack()
-    elif mode == "FINANSE (FLOW)": run_flow()
-    elif mode == "FLOTA (BASE)": run_base()
+    elif mode == "PLANER 3D (STACK)": 
+        run_stack()
+    elif mode == "FINANSE (FLOW)": 
+        run_flow()
+    elif mode == "FLOTA (BASE)": 
+        run_base()
 
 if __name__ == "__main__":
     main_hub()
