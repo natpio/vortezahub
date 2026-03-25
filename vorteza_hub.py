@@ -23,14 +23,14 @@ st.set_page_config(
     page_icon="🕋"
 )
 
-# Funkcja pomocnicza do obrazów Base64 (zapobiega błędom ścieżek w CSS i HTML)
+# Funkcja pomocnicza do konwersji obrazu na base64
 def get_base64_image(image_path):
     if os.path.exists(image_path):
         with open(image_path, "rb") as img_file:
             return base64.b64encode(img_file.read()).decode()
     return ""
 
-# --- 3. DYNAMICZNY SILNIK STATYSTYK (TWOJA ORYGINALNA LOGIKA) ---
+# --- 3. DYNAMICZNY SILNIK STATYSTYK (TWOJA LOGIKA BIZNESOWA) ---
 def get_dashboard_stats():
     """Pobiera realne dane z Google Sheets i lokalnych JSONów dla Dashboardu."""
     stats = {"vehicles": 0, "alerts": 0, "euro": 0.0, "skus": 0}
@@ -42,7 +42,6 @@ def get_dashboard_stats():
             scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         )
         client = gspread.authorize(creds)
-        # Twój klucz arkusza
         sheet = client.open_by_key("1JV-vXpwAbvvboQd7eijashVmS3kkOqTf_LJrbrsWSxo").sheet1
         df_base = pd.DataFrame(sheet.get_all_records())
         if not df_base.empty:
@@ -78,7 +77,7 @@ def inject_hub_theme():
                 background-size: cover; background-attachment: fixed; color: #FFFFFF; font-family: 'Montserrat', sans-serif; 
             }}
             
-            /* Naprawa paska bocznego */
+            /* Pasek boczny */
             section[data-testid="stSidebar"] {{ 
                 background-color: rgba(3, 3, 3, 0.98) !important; 
                 border-right: 2px solid var(--v-copper); 
@@ -99,7 +98,7 @@ def inject_hub_theme():
                 background: rgba(10, 10, 10, 0.9);
                 border: 2px solid var(--v-copper);
                 border-radius: 15px;
-                padding: 40px 10px;
+                padding: 50px 10px;
                 transition: 0.4s;
                 height: 280px;
                 display: flex;
@@ -112,29 +111,14 @@ def inject_hub_theme():
                 transform: translateY(-8px);
                 box-shadow: 0 15px 35px rgba(181, 136, 99, 0.5);
             }}
-            .module-card img {{ 
-                width: 130px; 
-                margin-bottom: 20px; 
-                filter: drop-shadow(0 0 10px rgba(181, 136, 99, 0.5)); 
-            }}
-            .module-card h3 {{ 
-                margin: 0; 
-                font-size: 1.8rem !important; 
-                letter-spacing: 5px !important; 
-            }}
+            .module-card img {{ width: 130px; margin-bottom: 20px; filter: drop-shadow(0 0 10px rgba(181, 136, 99, 0.5)); }}
+            .module-card h3 {{ margin: 0; font-size: 2rem !important; letter-spacing: 6px !important; }}
 
-            /* Przezroczysty przycisk na całą powierzchnię karty */
+            /* Nakładka przycisku na całą ramkę */
             .stButton button {{
-                position: absolute; 
-                top: 0; 
-                left: 0; 
-                width: 100%; 
-                height: 280px;
-                background: transparent !important; 
-                border: none !important; 
-                color: transparent !important;
-                z-index: 10; 
-                cursor: pointer;
+                position: absolute; top: 0; left: 0; width: 100%; height: 280px;
+                background: transparent !important; border: none !important; color: transparent !important;
+                z-index: 10; cursor: pointer;
             }}
             
             [data-testid="stMetricValue"] {{ color: var(--v-copper) !important; }}
@@ -148,12 +132,9 @@ def main_hub():
     inject_hub_theme()
     
     # Inicjalizacja stanów sesji
-    if "global_auth" not in st.session_state: 
-        st.session_state.global_auth = False
-    if "app_mode" not in st.session_state:
-        st.session_state.app_mode = "PULPIT (DASHBOARD)"
-    if "username" not in st.session_state: 
-        st.session_state.username = "UNAUTHORIZED"
+    if "global_auth" not in st.session_state: st.session_state.global_auth = False
+    if "app_mode" not in st.session_state: st.session_state.app_mode = "PULPIT (DASHBOARD)"
+    if "username" not in st.session_state: st.session_state.username = "UNAUTHORIZED"
 
     # --- EKRAN LOGOWANIA ---
     if not st.session_state.global_auth:
@@ -179,9 +160,8 @@ def main_hub():
                         st.error("ACCESS DENIED: INVALID KEY")
         return
 
-    # --- PASEK BOCZNY (SIDEBAR) ---
+    # --- PASEK BOCZNY ---
     with st.sidebar:
-        # Logo w Base64 - pewność wyświetlania
         logo_side_b64 = get_base64_image(os.path.join("assets", "logo_vorteza.jpg"))
         if logo_side_b64:
             st.markdown(f'<p style="text-align:center; margin-bottom: -15px;"><img src="data:image/jpg;base64,{logo_side_b64}" style="width: 100%; max-width: 250px;"></p>', unsafe_allow_html=True)
@@ -189,15 +169,7 @@ def main_hub():
         st.markdown("<h2 style='text-align:center; margin-top: 0;'>VORTEZA</h2>", unsafe_allow_html=True)
         st.markdown("<p style='text-align:center;'><span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span></p>", unsafe_allow_html=True)
         
-        # Nawigacja bez emotikon
-        modes_map = {
-            "DASHBOARD": "PULPIT (DASHBOARD)",
-            "STACK": "PLANER 3D (STACK)",
-            "FLOW": "FINANSE (FLOW)",
-            "BASE": "FLOTA (BASE)"
-        }
-        
-        # Wyznaczanie aktualnego indeksu dla radia
+        modes_map = {"DASHBOARD": "PULPIT (DASHBOARD)", "STACK": "PLANER 3D (STACK)", "FLOW": "FINANSE (FLOW)", "BASE": "FLOTA (BASE)"}
         current_display = "DASHBOARD"
         for k, v in modes_map.items():
             if v == st.session_state.app_mode: current_display = k
@@ -225,7 +197,6 @@ def main_hub():
         with st.spinner("Aktualizacja parametrów operacyjnych..."):
             s = get_dashboard_stats()
         
-        # Sekcja statystyk
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("POJAZDY", s["vehicles"])
         a_color = "inverse" if s["alerts"] > 0 else "normal"
@@ -237,30 +208,30 @@ def main_hub():
         
         # SIATKA INTERAKTYWNYCH KAFELKÓW
         m1, m2, m3 = st.columns(3)
-        
-        # Przygotowanie ikon
         i_stack = get_base64_image(os.path.join("assets", "icon_stack.png"))
         i_flow = get_base64_image(os.path.join("assets", "icon_flow.png"))
         i_base = get_base64_image(os.path.join("assets", "icon_base.png"))
 
         with m1:
-            st.markdown(f"""<div class='module-container'><div class='module-card'><img src='data:image/png;base64,{i_stack}'><h3>STACK</h3></div></div>""", unsafe_allow_html=True)
+            st.markdown(f"<div class='module-container'><div class='module-card'><img src='data:image/png;base64,{i_stack}'><h3>STACK</h3></div></div>", unsafe_allow_html=True)
             if st.button(" ", key="btn_stack"):
                 st.session_state.app_mode = "PLANER 3D (STACK)"
                 st.rerun()
         with m2:
-            st.markdown(f"""<div class='module-container'><div class='module-card'><img src='data:image/png;base64,{i_flow}'><h3>FLOW</h3></div></div>""", unsafe_allow_html=True)
+            st.markdown(f"<div class='module-container'><div class='module-card'><img src='data:image/png;base64,{i_flow}'><h3>FLOW</h3></div></div>", unsafe_allow_html=True)
             if st.button(" ", key="btn_flow"):
                 st.session_state.app_mode = "FINANSE (FLOW)"
                 st.rerun()
         with m3:
-            st.markdown(f"""<div class='module-container'><div class='module-card'><img src='data:image/png;base64,{i_base}'><h3>BASE</h3></div></div>""", unsafe_allow_html=True)
+            st.markdown(f"<div class='module-container'><div class='module-card'><img src='data:image/png;base64,{i_base}'><h3>BASE</h3></div></div>", unsafe_allow_html=True)
             if st.button(" ", key="btn_base"):
                 st.session_state.app_mode = "FLOTA (BASE)"
                 st.rerun()
 
         if s["alerts"] > 0:
             st.error(f"UWAGA: Wykryto {s['alerts']} usterki w module BASE. Wymagana weryfikacja.")
+        else:
+            st.success("Status floty: NOMINALNY. Wszystkie systemy sprawne.")
 
     # Pozostałe moduły systemu
     elif st.session_state.app_mode == "PLANER 3D (STACK)": 
