@@ -189,9 +189,10 @@ def run_core():
                                 st.rerun()
                         with a2:
                             if st.button("💸 FLOW", key=f"flw_{o_id}"):
-                                # Przekazanie trasy do FLOW (zrobimy to w kolejnym kroku we flow.py)
+                                # Przekazanie trasy I STAWKI do FLOW
                                 st.session_state.flow_origin = row.get('Start', '')
                                 st.session_state.flow_dest = row.get('Koniec', '')
+                                st.session_state.flow_rate = row.get('Stawka', '')
                                 st.session_state.active_module = "FINANSE (FLOW)"
                                 st.rerun()
                             
