@@ -23,11 +23,13 @@ st.set_page_config(
     page_icon="🕋"
 )
 
-# Funkcja pomocnicza do konwersji obrazu na base64
+# Funkcja pomocnicza do obrazów Base64 (zapobiega błędom wyświetlania)
 def get_base64_image(image_path):
     if os.path.exists(image_path):
-        with open(image_path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode()
+        try:
+            with open(image_path, "rb") as img_file:
+                return base64.b64encode(img_file.read()).decode()
+        except: return ""
     return ""
 
 # --- 3. DYNAMICZNY SILNIK STATYSTYK (TWOJA LOGIKA BIZNESOWA) ---
@@ -71,13 +73,12 @@ def inject_hub_theme():
             @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&family=JetBrains+Mono&display=swap');
             :root {{ --v-copper: #B58863; --v-dark: #060606; }}
             
-            /* Tło główne */
             .stApp {{ 
                 background-image: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url("data:image/jpg;base64,{bg_img}");
                 background-size: cover; background-attachment: fixed; color: #FFFFFF; font-family: 'Montserrat', sans-serif; 
             }}
             
-            /* Pasek boczny */
+            /* STABILNY PASEK BOCZNY */
             section[data-testid="stSidebar"] {{ 
                 background-color: rgba(3, 3, 3, 0.98) !important; 
                 border-right: 2px solid var(--v-copper); 
@@ -88,19 +89,20 @@ def inject_hub_theme():
             [data-testid="stSidebar"] label {{
                 color: var(--v-copper) !important;
                 font-weight: 600 !important;
+                font-size: 1.05rem;
             }}
 
             h1, h2, h3 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 4px !important; font-weight: 700 !important; text-align: center; }}
             
             /* INTERAKTYWNE KARTY DASHBOARDU */
-            .module-container {{ position: relative; text-align: center; margin-bottom: 20px; }}
+            .module-container {{ position: relative; text-align: center; margin-bottom: 25px; }}
             .module-card {{
                 background: rgba(10, 10, 10, 0.9);
                 border: 2px solid var(--v-copper);
                 border-radius: 15px;
-                padding: 50px 10px;
+                padding: 40px 10px;
                 transition: 0.4s;
-                height: 280px;
+                height: 290px;
                 display: flex;
                 flex-direction: column;
                 justify-content: center;
@@ -111,12 +113,20 @@ def inject_hub_theme():
                 transform: translateY(-8px);
                 box-shadow: 0 15px 35px rgba(181, 136, 99, 0.5);
             }}
-            .module-card img {{ width: 130px; margin-bottom: 20px; filter: drop-shadow(0 0 10px rgba(181, 136, 99, 0.5)); }}
-            .module-card h3 {{ margin: 0; font-size: 2rem !important; letter-spacing: 6px !important; }}
+            .module-card img {{ 
+                width: 140px; 
+                margin-bottom: 25px; 
+                filter: drop-shadow(0 0 10px rgba(181, 136, 99, 0.5)); 
+            }}
+            .module-card h3 {{ 
+                margin: 0; 
+                font-size: 1.9rem !important; 
+                letter-spacing: 6px !important; 
+            }}
 
-            /* Nakładka przycisku na całą ramkę */
+            /* Przezroczysty przycisk na całą ramkę */
             .stButton button {{
-                position: absolute; top: 0; left: 0; width: 100%; height: 280px;
+                position: absolute; top: 0; left: 0; width: 100%; height: 290px;
                 background: transparent !important; border: none !important; color: transparent !important;
                 z-index: 10; cursor: pointer;
             }}
@@ -131,7 +141,6 @@ def inject_hub_theme():
 def main_hub():
     inject_hub_theme()
     
-    # Inicjalizacja stanów sesji
     if "global_auth" not in st.session_state: st.session_state.global_auth = False
     if "app_mode" not in st.session_state: st.session_state.app_mode = "PULPIT (DASHBOARD)"
     if "username" not in st.session_state: st.session_state.username = "UNAUTHORIZED"
@@ -154,28 +163,28 @@ def main_hub():
                 if st.form_submit_button("VALIDATE ACCESS"):
                     if pwd_input == st.secrets["password"]:
                         st.session_state.global_auth = True
-                        st.session_state.username = st.secrets["USERS"].get("admin", "NeonParrot821")
+                        st.session_state.username = st.secrets["USERS"].get("admin", "GOLIATH-OPERATOR")
                         st.rerun()
-                    else:
-                        st.error("ACCESS DENIED: INVALID KEY")
+                    else: st.error("ACCESS DENIED: INVALID KEY")
         return
 
-    # --- PASEK BOCZNY ---
+    # --- PASEK BOCZNY (SIDEBAR) ---
     with st.sidebar:
         logo_side_b64 = get_base64_image(os.path.join("assets", "logo_vorteza.jpg"))
         if logo_side_b64:
             st.markdown(f'<p style="text-align:center; margin-bottom: -15px;"><img src="data:image/jpg;base64,{logo_side_b64}" style="width: 100%; max-width: 250px;"></p>', unsafe_allow_html=True)
         
         st.markdown("<h2 style='text-align:center; margin-top: 0;'>VORTEZA</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center;'><span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span></p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center;'><span class='v-status-glow'>● SYSTEM ONLINE</span></p>", unsafe_allow_html=True)
         
-        modes_map = {"DASHBOARD": "PULPIT (DASHBOARD)", "STACK": "PLANER 3D (STACK)", "FLOW": "FINANSE (FLOW)", "BASE": "FLOTA (BASE)"}
-        current_display = "DASHBOARD"
-        for k, v in modes_map.items():
-            if v == st.session_state.app_mode: current_display = k
-            
-        choice = st.radio("NAWIGACJA", list(modes_map.keys()), index=list(modes_map.keys()).index(current_display))
-        st.session_state.app_mode = modes_map[choice]
+        # MAPOWANIE NAZW DLA KOMPATYBILNOŚCI Z MODUŁAMI
+        original_modes = ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"]
+        display_to_original = {"DASHBOARD": original_modes[0], "STACK": original_modes[1], "FLOW": original_modes[2], "BASE": original_modes[3]}
+        original_to_display = {v: k for k, v in display_to_original.items()}
+        
+        current_display = original_to_display.get(st.session_state.app_mode, "DASHBOARD")
+        choice = st.radio("NAWIGACJA", list(display_to_original.keys()), index=list(display_to_original.keys()).index(current_display))
+        st.session_state.app_mode = display_to_original[choice]
         
         st.divider()
         st.markdown(f"**OPERATOR:** {st.session_state.username}")
@@ -206,7 +215,7 @@ def main_hub():
 
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # SIATKA INTERAKTYWNYCH KAFELKÓW
+        # SIATKA KLIKALNYCH KAFELKÓW (Z IKONAMI WEWNĄTRZ RAMKI)
         m1, m2, m3 = st.columns(3)
         i_stack = get_base64_image(os.path.join("assets", "icon_stack.png"))
         i_flow = get_base64_image(os.path.join("assets", "icon_flow.png"))
@@ -230,16 +239,11 @@ def main_hub():
 
         if s["alerts"] > 0:
             st.error(f"UWAGA: Wykryto {s['alerts']} usterki w module BASE. Wymagana weryfikacja.")
-        else:
-            st.success("Status floty: NOMINALNY. Wszystkie systemy sprawne.")
 
     # Pozostałe moduły systemu
-    elif st.session_state.app_mode == "PLANER 3D (STACK)": 
-        run_stack()
-    elif st.session_state.app_mode == "FINANSE (FLOW)": 
-        run_flow()
-    elif st.session_state.app_mode == "FLOTA (BASE)": 
-        run_base()
+    elif st.session_state.app_mode == "PLANER 3D (STACK)": run_stack()
+    elif st.session_state.app_mode == "FINANSE (FLOW)": run_flow()
+    elif st.session_state.app_mode == "FLOTA (BASE)": run_base()
 
 if __name__ == "__main__":
     main_hub()
