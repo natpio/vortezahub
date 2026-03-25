@@ -10,7 +10,7 @@ import base64
 # 0. ZASOBY I KONFIGURACJA (STRUKTURA GITHUB)
 # ==============================================================================
 PATH_CONFIG = os.path.join("data", "config.json")
-PATH_BG = os.path.join("assets", "bg_vorteza.png")
+PATH_BG = os.path.join("assets", "tlo_hub_2.jpg") # Zaktualizowane tło dla spójności
 
 def load_config():
     """Wczytuje parametry kosztowe i bazę tras z folderu data/."""
@@ -59,8 +59,10 @@ def inject_vorteza_flow_ui():
             @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;700&family=JetBrains+Mono&display=swap');
             
             .stApp {{ 
-                background-image: url("data:image/png;base64,{bg_data}"); 
-                background-size: cover; background-attachment: fixed; 
+                background: linear-gradient(rgba(6, 6, 6, 0.85), rgba(6, 6, 6, 0.85)), 
+                            url("data:image/jpeg;base64,{bg_data}") !important;
+                background-size: cover !important; 
+                background-attachment: fixed !important; 
             }}
 
             /* Kafelki Finansowe */
@@ -111,8 +113,20 @@ def show_financial_analysis():
         st.markdown("### 🛠️ KONFIGURACJA")
         source_mode = st.radio("ŹRÓDŁO DANYCH", ["🔗 SYNC (ZE STACK)", "⚡ MANUAL (SZYBKI)"], label_visibility="collapsed")
         st.divider()
-        origin = st.selectbox("PUNKT STARTU", list(CONF["DISTANCES_AND_MYTO"].keys()))
-        dest = st.selectbox("PUNKT DOCELOWY", list(CONF["DISTANCES_AND_MYTO"][origin].keys()))
+        
+        # --- INTEGRACJA Z CORE ---
+        # Odczytujemy punkt startu i celu z sesji (jeśli weszliśmy z CORE)
+        core_orig = st.session_state.get("flow_origin", "")
+        core_dest = st.session_state.get("flow_dest", "")
+        
+        origins_list = list(CONF["DISTANCES_AND_MYTO"].keys())
+        # Bezpieczne ustawienie indeksu (jesli CORE podał miasto z bazy)
+        idx_orig = origins_list.index(core_orig) if core_orig in origins_list else 0
+        origin = st.selectbox("PUNKT STARTU", origins_list, index=idx_orig)
+        
+        dests_list = list(CONF["DISTANCES_AND_MYTO"][origin].keys())
+        idx_dest = dests_list.index(core_dest) if core_dest in dests_list else 0
+        dest = st.selectbox("PUNKT DOCELOWY", dests_list, index=idx_dest)
         
         # Pobranie kursu EURO z config.json
         eur_rate = st.number_input("KURS EUR/PLN", value=CONF.get("EURO_RATE", 4.30), step=0.01)
@@ -146,7 +160,7 @@ def show_financial_analysis():
     # Obsługa danych pojazdu
     if source_mode == "🔗 SYNC (ZE STACK)":
         if 'v_manifest' not in st.session_state or not st.session_state.v_manifest:
-            st.warning("⚠️ BRAK DANYCH W STACK."); return
+            st.warning("⚠️ BRAK DANYCH W STACK. ZMIEŃ ŹRÓDŁO DANYCH NA 'MANUAL' LUB ZBUDUJ MANIFEST."); return
         total_cases = sum(math.ceil(it['p_act'] / it.get('itemsPerCase', 1)) for it in st.session_state.v_manifest)
         active_veh_name = st.selectbox("POJAZD DO ANALIZY", list(VEH_MAP.keys()))
     else:
