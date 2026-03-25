@@ -119,7 +119,6 @@ def run_core():
 
     with st.sidebar:
         st.markdown("### 🎛️ PANEL STEROWANIA")
-        # --- DODANO TRZECI TRYB: BAZA / ARCHIWUM ---
         mode = st.radio("TRYB PRACY:", ["📊 TABLICA ZLECEŃ (KANBAN)", "➕ NOWE ZLECENIE", "🗄️ BAZA / ARCHIWUM"], label_visibility="collapsed")
         st.divider()
 
@@ -154,7 +153,6 @@ def run_core():
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    # --- PRZYCISKI Z LOGIKĄ COFANIA I ANULOWANIA ---
                     if title == "DRAFT (NOWE)":
                         a1, a2 = st.columns(2)
                         if a1.button("✅ AKCEPT", key=f"akc_{o_id}"):
@@ -221,9 +219,14 @@ def run_core():
                             update_order_status(o_id, "ZAAKCEPTOWANE")
                             st.rerun()
                             
+                    # --- ZMIENIONA LOGIKA DLA ZAKOŃCZONYCH (ARCHIWIZACJA) ---
                     elif title == "ZAKOŃCZONE":
-                        if st.button("↩️ COFNIJ DO TRASY", key=f"cof_{o_id}"):
+                        a1, a2 = st.columns(2)
+                        if a1.button("↩️ COFNIJ", key=f"cof_{o_id}"):
                             update_order_status(o_id, "W TRASIE")
+                            st.rerun()
+                        if a2.button("🗄️ ARCHIWIZUJ", key=f"arc_{o_id}"):
+                            update_order_status(o_id, "ZAMKNIĘTE")
                             st.rerun()
 
     elif mode == "➕ NOWE ZLECENIE":
@@ -293,21 +296,20 @@ def run_core():
                 else:
                     st.error("Błąd zapisu. Upewnij się, że masz zakładkę 'Zlecenia' w Google Sheets.")
 
-    # --- NOWY WIDOK: BAZA / ARCHIWUM ---
     elif mode == "🗄️ BAZA / ARCHIWUM":
         st.markdown("### 🗄️ REJESTR WSZYSTKICH ZLECEŃ")
         if df.empty:
             st.info("Baza zleceń jest pusta.")
         else:
-            # Formatujemy wyświetlanie JSONa ze sprzętem, by nie zaciemniał tabeli
             display_df = df.copy()
             
-            # Liczniki
-            col1, col2, col3, col4 = st.columns(4)
+            # --- DODANY LICZNIK ZARCHIWIZOWANYCH ---
+            col1, col2, col3, col4, col5 = st.columns(5)
             col1.metric("Wszystkich Zleceń", len(display_df))
             col2.metric("W Trasie", len(display_df[display_df['Status'] == 'W TRASIE']))
-            col3.metric("Zakończone", len(display_df[display_df['Status'] == 'ZAKOŃCZONE']))
-            col4.metric("Anulowane", len(display_df[display_df['Status'] == 'ANULOWANE']))
+            col3.metric("Zakończone (Oczekujące)", len(display_df[display_df['Status'] == 'ZAKOŃCZONE']))
+            col4.metric("Zarchiwizowane", len(display_df[display_df['Status'] == 'ZAMKNIĘTE']))
+            col5.metric("Anulowane", len(display_df[display_df['Status'] == 'ANULOWANE']))
             
             st.dataframe(display_df, use_container_width=True, hide_index=True)
 
