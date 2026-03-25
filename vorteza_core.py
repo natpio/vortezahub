@@ -99,7 +99,7 @@ def inject_core_theme():
             .status-trasa {{ border-left-color: #E67E22 !important; }}
             .status-koniec {{ border-left-color: #27AE60 !important; opacity: 0.6; }}
             
-            div[data-testid="stButton"] button {{ width: 100%; border-color: #B58863 !important; color: #B58863 !important; background: transparent !important; }}
+            div[data-testid="stButton"] button {{ width: 100%; border-color: #B58863 !important; color: #B58863 !important; background: transparent !important; margin-bottom: 5px; }}
             div[data-testid="stButton"] button:hover {{ background: #B58863 !important; color: #000 !important; }}
         </style>
     """, unsafe_allow_html=True)
@@ -119,13 +119,15 @@ def run_core():
 
     with st.sidebar:
         st.markdown("### 🎛️ PANEL STEROWANIA")
-        mode = st.radio("TRYB PRACY:", ["📊 TABLICA ZLECEŃ (KANBAN)", "➕ NOWE ZLECENIE"], label_visibility="collapsed")
+        # --- DODANO TRZECI TRYB: BAZA / ARCHIWUM ---
+        mode = st.radio("TRYB PRACY:", ["📊 TABLICA ZLECEŃ (KANBAN)", "➕ NOWE ZLECENIE", "🗄️ BAZA / ARCHIWUM"], label_visibility="collapsed")
         st.divider()
 
+    df = load_orders()
+
     if mode == "📊 TABLICA ZLECEŃ (KANBAN)":
-        df = load_orders()
         if df.empty:
-            st.info("Brak aktywnych zleceń w systemie. Przejdź do zakładki 'NOWE ZLECENIE'.")
+            st.info("Brak zleceń w systemie. Przejdź do zakładki 'NOWE ZLECENIE'.")
             return
             
         c1, c2, c3, c4 = st.columns(4)
@@ -152,73 +154,80 @@ def run_core():
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    a1, a2 = st.columns(2)
-                    
-                    # --- INTEGRACJA: DRAFT -> AKCEPT / STACK ---
+                    # --- PRZYCISKI Z LOGIKĄ COFANIA I ANULOWANIA ---
                     if title == "DRAFT (NOWE)":
-                        with a1:
-                            if st.button("✅ AKCEPT", key=f"akc_{o_id}"):
-                                update_order_status(o_id, "ZAAKCEPTOWANE")
+                        a1, a2 = st.columns(2)
+                        if a1.button("✅ AKCEPT", key=f"akc_{o_id}"):
+                            update_order_status(o_id, "ZAAKCEPTOWANE")
+                            st.rerun()
+                        if a2.button("📦 STACK", key=f"stk_{o_id}"):
+                            try:
+                                order_items = json.loads(row.get('Sprzet', '[]'))
+                                new_manifest = []
+                                for item in order_items:
+                                    for p in products_data:
+                                        if p['name'] == item['SKU']:
+                                            p_copy = p.copy()
+                                            p_copy['p_act'] = int(item['ILOSC'])
+                                            new_manifest.append(p_copy)
+                                            break
+                                st.session_state.v_manifest = new_manifest
+                                st.session_state.active_module = "PLANER 3D (STACK)"
                                 st.rerun()
-                        with a2:
-                            if st.button("📦 STACK", key=f"stk_{o_id}"):
-                                try:
-                                    order_items = json.loads(row.get('Sprzet', '[]'))
-                                    new_manifest = []
-                                    for item in order_items:
-                                        for p in products_data:
-                                            if p['name'] == item['SKU']:
-                                                p_copy = p.copy()
-                                                p_copy['p_act'] = int(item['ILOSC'])
-                                                new_manifest.append(p_copy)
-                                                break
+                            except Exception as e: st.error(f"Błąd ładunku: {e}")
+                            
+                        if st.button("❌ ANULUJ", key=f"anl_{o_id}"):
+                            update_order_status(o_id, "ANULOWANE")
+                            st.rerun()
                                     
-                                    st.session_state.v_manifest = new_manifest
-                                    st.session_state.active_module = "PLANER 3D (STACK)"
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Błąd ładunku: {e}")
-                                    
-                    # --- INTEGRACJA: AKCEPT -> TRASA / FLOW ---
                     elif title == "ZAAKCEPTOWANE":
-                        with a1:
-                            if st.button("🚚 W DROGĘ", key=f"drg_{o_id}"):
-                                update_order_status(o_id, "W TRASIE")
+                        a1, a2 = st.columns(2)
+                        if a1.button("🚚 W DROGĘ", key=f"drg_{o_id}"):
+                            update_order_status(o_id, "W TRASIE")
+                            st.rerun()
+                        if a2.button("💸 FLOW", key=f"flw_{o_id}"):
+                            try:
+                                order_items = json.loads(row.get('Sprzet', '[]'))
+                                new_manifest = []
+                                for item in order_items:
+                                    for p in products_data:
+                                        if p['name'] == item['SKU']:
+                                            p_copy = p.copy()
+                                            p_copy['p_act'] = int(item['ILOSC'])
+                                            new_manifest.append(p_copy)
+                                            break
+                                st.session_state.v_manifest = new_manifest
+                                st.session_state.flow_origin = row.get('Start', '')
+                                st.session_state.flow_dest = row.get('Koniec', '')
+                                st.session_state.flow_rate = row.get('Stawka', '')
+                                st.session_state.active_module = "FINANSE (FLOW)"
                                 st.rerun()
-                        with a2:
-                            if st.button("💸 FLOW", key=f"flw_{o_id}"):
-                                try:
-                                    # BUDUJEMY MANIFEST DLA FLOW (Rozwiązanie błędu "BRAK DANYCH W STACK")
-                                    order_items = json.loads(row.get('Sprzet', '[]'))
-                                    new_manifest = []
-                                    for item in order_items:
-                                        for p in products_data:
-                                            if p['name'] == item['SKU']:
-                                                p_copy = p.copy()
-                                                p_copy['p_act'] = int(item['ILOSC'])
-                                                new_manifest.append(p_copy)
-                                                break
-                                    
-                                    st.session_state.v_manifest = new_manifest
-                                    
-                                    # Przekazanie trasy I STAWKI do FLOW
-                                    st.session_state.flow_origin = row.get('Start', '')
-                                    st.session_state.flow_dest = row.get('Koniec', '')
-                                    st.session_state.flow_rate = row.get('Stawka', '')
-                                    st.session_state.active_module = "FINANSE (FLOW)"
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Błąd ładunku przy otwieraniu FLOW: {e}")
+                            except Exception as e: st.error(f"Błąd ładunku: {e}")
+                            
+                        b1, b2 = st.columns(2)
+                        if b1.button("↩️ COFNIJ", key=f"cof_{o_id}"):
+                            update_order_status(o_id, "DRAFT (NOWE)")
+                            st.rerun()
+                        if b2.button("❌ ANULUJ", key=f"anl2_{o_id}"):
+                            update_order_status(o_id, "ANULOWANE")
+                            st.rerun()
                             
                     elif title == "W TRASIE":
-                        with a1:
-                            if st.button("🏁 KONIEC", key=f"kon_{o_id}"):
-                                update_order_status(o_id, "ZAKOŃCZONE")
-                                st.rerun()
+                        a1, a2 = st.columns(2)
+                        if a1.button("🏁 KONIEC", key=f"kon_{o_id}"):
+                            update_order_status(o_id, "ZAKOŃCZONE")
+                            st.rerun()
+                        if a2.button("↩️ COFNIJ", key=f"cof_{o_id}"):
+                            update_order_status(o_id, "ZAAKCEPTOWANE")
+                            st.rerun()
+                            
+                    elif title == "ZAKOŃCZONE":
+                        if st.button("↩️ COFNIJ DO TRASY", key=f"cof_{o_id}"):
+                            update_order_status(o_id, "W TRASIE")
+                            st.rerun()
 
     elif mode == "➕ NOWE ZLECENIE":
         st.markdown("### KREATOR ZLECENIA")
-        
         c_left, c_right = st.columns([2, 1])
         
         with c_left:
@@ -283,6 +292,24 @@ def run_core():
                     st.balloons()
                 else:
                     st.error("Błąd zapisu. Upewnij się, że masz zakładkę 'Zlecenia' w Google Sheets.")
+
+    # --- NOWY WIDOK: BAZA / ARCHIWUM ---
+    elif mode == "🗄️ BAZA / ARCHIWUM":
+        st.markdown("### 🗄️ REJESTR WSZYSTKICH ZLECEŃ")
+        if df.empty:
+            st.info("Baza zleceń jest pusta.")
+        else:
+            # Formatujemy wyświetlanie JSONa ze sprzętem, by nie zaciemniał tabeli
+            display_df = df.copy()
+            
+            # Liczniki
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Wszystkich Zleceń", len(display_df))
+            col2.metric("W Trasie", len(display_df[display_df['Status'] == 'W TRASIE']))
+            col3.metric("Zakończone", len(display_df[display_df['Status'] == 'ZAKOŃCZONE']))
+            col4.metric("Anulowane", len(display_df[display_df['Status'] == 'ANULOWANE']))
+            
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 if __name__ == "__main__":
     run_core()
