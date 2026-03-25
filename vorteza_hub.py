@@ -72,7 +72,6 @@ def inject_hub_theme():
     
     bg_style = ""
     if bg_b64:
-        # Lekki ciemny gradient nakładany na obrazek, by litery były czytelne
         bg_style = f"""
         .stApp {{
             background: linear-gradient(rgba(6, 6, 6, 0.85), rgba(6, 6, 6, 0.85)), 
@@ -96,7 +95,6 @@ def inject_hub_theme():
             .stButton>button {{ background-color: rgba(10,10,10,0.8) !important; color: var(--v-copper) !important; border: 1px solid var(--v-copper) !important; width: 100%; transition: 0.4s; }}
             .stButton>button:hover {{ background-color: var(--v-copper) !important; color: black !important; }}
             
-            /* Style dla dedykowanych kafelków nawigacyjnych na pulpicie */
             .module-card {{ 
                 background: rgba(10, 10, 10, 0.75); 
                 border: 1px solid rgba(181, 136, 99, 0.4); 
@@ -108,6 +106,11 @@ def inject_hub_theme():
             }}
         </style>
     """, unsafe_allow_html=True)
+
+# --- CALLBACK NAWIGACYJNY ---
+def navigate_to(page_name):
+    """Bezpieczna funkcja aktualizująca stan sesji przypisany do widgetu radio."""
+    st.session_state.current_page = page_name
 
 # --- 5. GŁÓWNA LOGIKA HUB-A ---
 def main_hub():
@@ -125,7 +128,6 @@ def main_hub():
     if not st.session_state.global_auth:
         _, col, _ = st.columns([0.8, 2, 0.8])
         with col:
-            # Implementacja video promocyjnego (odtworzy się tylko raz - loop=False)
             video_path = os.path.join("assets", "video 1.mp4")
             if os.path.exists(video_path):
                 st.video(video_path, autoplay=True, muted=True, loop=False)
@@ -149,7 +151,6 @@ def main_hub():
         st.markdown("<span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span>", unsafe_allow_html=True)
         st.divider()
         
-        # Klucz session_state "current_page" odpowiada za synchronizację z guzikami na pulpicie
         st.radio(
             "MODUŁY SYSTEMOWE", 
             ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"],
@@ -167,7 +168,6 @@ def main_hub():
     if st.session_state.current_page == "PULPIT (DASHBOARD)":
         st.markdown("<h1>DASHBOARD</h1>", unsafe_allow_html=True)
         
-        # Baner (wycentrowany, ograniczona wielkość)
         banner_path = os.path.join("assets", "baner 1.jpg")
         if os.path.exists(banner_path):
             _, b_col, _ = st.columns([1, 2, 1])
@@ -181,7 +181,6 @@ def main_hub():
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("POJAZDY W SYSTEMIE", s["vehicles"])
         
-        # Logika kolorowania alertów
         a_color = "inverse" if s["alerts"] > 0 else "normal"
         c2.metric("AKTYWNE ALERTY", s["alerts"], delta=s["alerts"], delta_color=a_color)
         
@@ -196,7 +195,7 @@ def main_hub():
 
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # --- ZARZĄDZANIE MODUŁAMI (KAFELKI NAWIGACYJNE Z IKONAMI) ---
+        # --- ZARZĄDZANIE MODUŁAMI (KAFELKI NAWIGACYJNE Z CALLBACKAMI) ---
         m1, m2, m3 = st.columns(3)
         
         with m1:
@@ -207,9 +206,7 @@ def main_hub():
                 if os.path.exists(icon_path_stack):
                     st.image(icon_path_stack, use_container_width=True)
             st.markdown("<h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>PLANER 3D</h4>", unsafe_allow_html=True)
-            if st.button("URUCHOM STACK", key="btn_go_stack"):
-                st.session_state.current_page = "PLANER 3D (STACK)"
-                st.rerun()
+            st.button("URUCHOM STACK", key="btn_go_stack", on_click=navigate_to, args=("PLANER 3D (STACK)",))
             st.markdown("</div>", unsafe_allow_html=True)
 
         with m2:
@@ -220,9 +217,7 @@ def main_hub():
                 if os.path.exists(icon_path_flow):
                     st.image(icon_path_flow, use_container_width=True)
             st.markdown("<h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>FINANSE</h4>", unsafe_allow_html=True)
-            if st.button("URUCHOM FLOW", key="btn_go_flow"):
-                st.session_state.current_page = "FINANSE (FLOW)"
-                st.rerun()
+            st.button("URUCHOM FLOW", key="btn_go_flow", on_click=navigate_to, args=("FINANSE (FLOW)",))
             st.markdown("</div>", unsafe_allow_html=True)
             
         with m3:
@@ -233,9 +228,7 @@ def main_hub():
                 if os.path.exists(icon_path_base):
                     st.image(icon_path_base, use_container_width=True)
             st.markdown("<h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>FLOTA</h4>", unsafe_allow_html=True)
-            if st.button("URUCHOM BASE", key="btn_go_base"):
-                st.session_state.current_page = "FLOTA (BASE)"
-                st.rerun()
+            st.button("URUCHOM BASE", key="btn_go_base", on_click=navigate_to, args=("FLOTA (BASE)",))
             st.markdown("</div>", unsafe_allow_html=True)
 
     # --- WŁAŚCIWE WYWOŁANIA MODUŁÓW ---
