@@ -4,7 +4,7 @@ import pandas as pd
 import json
 import os
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 from google.oauth2.service_account import Credentials
 import gspread
 
@@ -69,6 +69,22 @@ def update_order_status(order_id, new_status):
         return False
     except: return False
 
+def update_order_billing(order_id, inv_num, inv_date, term_days, is_paid):
+    try:
+        client = get_gspread_client()
+        sheet = client.open_by_key(SHEET_ID).worksheet("Zlecenia")
+        records = sheet.get_all_records()
+        for i, row in enumerate(records):
+            if str(row.get('ID')) == str(order_id):
+                row_idx = i + 2
+                sheet.update_cell(row_idx, 13, str(inv_num))   # M: Faktura
+                sheet.update_cell(row_idx, 14, str(inv_date))  # N: DataFaktury
+                sheet.update_cell(row_idx, 15, int(term_days)) # O: TerminDni
+                sheet.update_cell(row_idx, 16, str(is_paid))   # P: StatusPlatnosci
+                return True
+        return False
+    except: return False
+
 # ==============================================================================
 # 3. INTERFEJS I MOTYW VORTEZA
 # ==============================================================================
@@ -99,8 +115,16 @@ def inject_core_theme():
             .status-trasa {{ border-left-color: #E67E22 !important; }}
             .status-koniec {{ border-left-color: #27AE60 !important; opacity: 0.6; }}
             
+            .billing-card {{
+                background: rgba(20, 20, 20, 0.9); border: 1px solid #333;
+                border-left: 4px solid #E67E22; padding: 15px; margin-bottom: 15px; border-radius: 6px;
+            }}
+            
             div[data-testid="stButton"] button {{ width: 100%; border-color: #B58863 !important; color: #B58863 !important; background: transparent !important; margin-bottom: 5px; }}
             div[data-testid="stButton"] button:hover {{ background: #B58863 !important; color: #000 !important; }}
+            
+            /* Przycisk zapisu w formularzu billingowym */
+            .billing-btn div[data-testid="stButton"] button {{ background: rgba(181, 136, 99, 0.2) !important; }}
         </style>
     """, unsafe_allow_html=True)
 
@@ -119,11 +143,20 @@ def run_core():
 
     with st.sidebar:
         st.markdown("### 🎛️ PANEL STEROWANIA")
-        mode = st.radio("TRYB PRACY:", ["📊 TABLICA ZLECEŃ (KANBAN)", "➕ NOWE ZLECENIE", "🗄️ BAZA / ARCHIWUM"], label_visibility="collapsed")
+        # --- DODANO CZWARTY TRYB: ROZLICZENIA ---
+        mode = st.radio("TRYB PRACY:", [
+            "📊 TABLICA ZLECEŃ (KANBAN)", 
+            "➕ NOWE ZLECENIE", 
+            "💰 ROZLICZENIA (BILLING)",
+            "🗄️ BAZA / ARCHIWUM"
+        ], label_visibility="collapsed")
         st.divider()
 
     df = load_orders()
 
+    # --------------------------------------------------------------------------
+    # WIDOK 1: KANBAN
+    # --------------------------------------------------------------------------
     if mode == "📊 TABLICA ZLECEŃ (KANBAN)":
         if df.empty:
             st.info("Brak zleceń w systemie. Przejdź do zakładki 'NOWE ZLECENIE'.")
@@ -135,7 +168,6 @@ def run_core():
         for title, col in columns.items():
             with col:
                 st.markdown(f"<h4 style='text-align:center; font-size:1rem; border-bottom:1px solid #B58863; padding-bottom:10px;'>{title}</h4>", unsafe_allow_html=True)
-                
                 df_filtered = df[df['Status'].astype(str) == title]
                 
                 for _, row in df_filtered.iterrows():
@@ -156,8 +188,7 @@ def run_core():
                     if title == "DRAFT (NOWE)":
                         a1, a2 = st.columns(2)
                         if a1.button("✅ AKCEPT", key=f"akc_{o_id}"):
-                            update_order_status(o_id, "ZAAKCEPTOWANE")
-                            st.rerun()
+                            update_order_status(o_id, "ZAAKCEPTOWANE"); st.rerun()
                         if a2.button("📦 STACK", key=f"stk_{o_id}"):
                             try:
                                 order_items = json.loads(row.get('Sprzet', '[]'))
@@ -165,24 +196,18 @@ def run_core():
                                 for item in order_items:
                                     for p in products_data:
                                         if p['name'] == item['SKU']:
-                                            p_copy = p.copy()
-                                            p_copy['p_act'] = int(item['ILOSC'])
-                                            new_manifest.append(p_copy)
-                                            break
+                                            p_copy = p.copy(); p_copy['p_act'] = int(item['ILOSC']); new_manifest.append(p_copy); break
                                 st.session_state.v_manifest = new_manifest
-                                st.session_state.active_module = "PLANER 3D (STACK)"
-                                st.rerun()
+                                st.session_state.active_module = "PLANER 3D (STACK)"; st.rerun()
                             except Exception as e: st.error(f"Błąd ładunku: {e}")
                             
                         if st.button("❌ ANULUJ", key=f"anl_{o_id}"):
-                            update_order_status(o_id, "ANULOWANE")
-                            st.rerun()
+                            update_order_status(o_id, "ANULOWANE"); st.rerun()
                                     
                     elif title == "ZAAKCEPTOWANE":
                         a1, a2 = st.columns(2)
                         if a1.button("🚚 W DROGĘ", key=f"drg_{o_id}"):
-                            update_order_status(o_id, "W TRASIE")
-                            st.rerun()
+                            update_order_status(o_id, "W TRASIE"); st.rerun()
                         if a2.button("💸 FLOW", key=f"flw_{o_id}"):
                             try:
                                 order_items = json.loads(row.get('Sprzet', '[]'))
@@ -190,45 +215,37 @@ def run_core():
                                 for item in order_items:
                                     for p in products_data:
                                         if p['name'] == item['SKU']:
-                                            p_copy = p.copy()
-                                            p_copy['p_act'] = int(item['ILOSC'])
-                                            new_manifest.append(p_copy)
-                                            break
+                                            p_copy = p.copy(); p_copy['p_act'] = int(item['ILOSC']); new_manifest.append(p_copy); break
                                 st.session_state.v_manifest = new_manifest
                                 st.session_state.flow_origin = row.get('Start', '')
                                 st.session_state.flow_dest = row.get('Koniec', '')
                                 st.session_state.flow_rate = row.get('Stawka', '')
-                                st.session_state.active_module = "FINANSE (FLOW)"
-                                st.rerun()
+                                st.session_state.active_module = "FINANSE (FLOW)"; st.rerun()
                             except Exception as e: st.error(f"Błąd ładunku: {e}")
                             
                         b1, b2 = st.columns(2)
                         if b1.button("↩️ COFNIJ", key=f"cof_{o_id}"):
-                            update_order_status(o_id, "DRAFT (NOWE)")
-                            st.rerun()
+                            update_order_status(o_id, "DRAFT (NOWE)"); st.rerun()
                         if b2.button("❌ ANULUJ", key=f"anl2_{o_id}"):
-                            update_order_status(o_id, "ANULOWANE")
-                            st.rerun()
+                            update_order_status(o_id, "ANULOWANE"); st.rerun()
                             
                     elif title == "W TRASIE":
                         a1, a2 = st.columns(2)
                         if a1.button("🏁 KONIEC", key=f"kon_{o_id}"):
-                            update_order_status(o_id, "ZAKOŃCZONE")
-                            st.rerun()
+                            update_order_status(o_id, "ZAKOŃCZONE"); st.rerun()
                         if a2.button("↩️ COFNIJ", key=f"cof_{o_id}"):
-                            update_order_status(o_id, "ZAAKCEPTOWANE")
-                            st.rerun()
+                            update_order_status(o_id, "ZAAKCEPTOWANE"); st.rerun()
                             
-                    # --- ZMIENIONA LOGIKA DLA ZAKOŃCZONYCH (ARCHIWIZACJA) ---
                     elif title == "ZAKOŃCZONE":
                         a1, a2 = st.columns(2)
                         if a1.button("↩️ COFNIJ", key=f"cof_{o_id}"):
-                            update_order_status(o_id, "W TRASIE")
-                            st.rerun()
+                            update_order_status(o_id, "W TRASIE"); st.rerun()
                         if a2.button("🗄️ ARCHIWIZUJ", key=f"arc_{o_id}"):
-                            update_order_status(o_id, "ZAMKNIĘTE")
-                            st.rerun()
+                            update_order_status(o_id, "ZAMKNIĘTE"); st.rerun()
 
+    # --------------------------------------------------------------------------
+    # WIDOK 2: KREATOR ZLECENIA
+    # --------------------------------------------------------------------------
     elif mode == "➕ NOWE ZLECENIE":
         st.markdown("### KREATOR ZLECENIA")
         c_left, c_right = st.columns([2, 1])
@@ -284,9 +301,11 @@ def run_core():
                 order_id = f"VC-{now.strftime('%y')}-{now.strftime('%H%M%S')}"
                 sprzet_json = json.dumps(st.session_state.core_cart, ensure_ascii=False)
                 
+                # Zapisuje puste wartości dla rozliczeń przy tworzeniu nowego zlecenia
                 row = [
                     order_id, "DRAFT (NOWE)", klient, current_user, start, koniec, 
-                    str(data_z), str(data_r), postoj, stawka, sprzet_json, uwagi
+                    str(data_z), str(data_r), postoj, stawka, sprzet_json, uwagi,
+                    "", "", 14, "NIE"
                 ]
                 
                 if save_new_order(row):
@@ -294,23 +313,113 @@ def run_core():
                     st.success(f"Zlecenie {order_id} zostało pomyślnie utworzone!")
                     st.balloons()
                 else:
-                    st.error("Błąd zapisu. Upewnij się, że masz zakładkę 'Zlecenia' w Google Sheets.")
+                    st.error("Błąd zapisu. Upewnij się, że masz 16 kolumn w Google Sheets (dodaj: Faktura, DataFaktury, TerminDni, StatusPlatnosci).")
 
+    # --------------------------------------------------------------------------
+    # WIDOK 3: ROZLICZENIA (BILLING)
+    # --------------------------------------------------------------------------
+    elif mode == "💰 ROZLICZENIA (BILLING)":
+        st.markdown("### 💰 PANEL ROZLICZEŃ I WINDYKACJI")
+        st.write("Wprowadzaj faktury do zleceń, które zjechały na bazę i kontroluj terminy płatności.")
+        st.markdown("---")
+        
+        if df.empty:
+            st.info("Brak zleceń w systemie.")
+        else:
+            # Filtrujemy zlecenia Zakończone oraz Zarchiwizowane
+            df_billing = df[df['Status'].isin(['ZAKOŃCZONE', 'ZAMKNIĘTE'])]
+            
+            if df_billing.empty:
+                st.success("Brak zakończonych zleceń do rozliczenia.")
+            else:
+                for _, row in df_billing.iterrows():
+                    o_id = row.get('ID', 'N/A')
+                    
+                    # Odczytywanie zapisanych danych faktury
+                    inv_no = str(row.get('Faktura', '')).strip()
+                    inv_date_str = str(row.get('DataFaktury', '')).strip()
+                    
+                    try: term_days = int(row.get('TerminDni', 14))
+                    except: term_days = 14
+                        
+                    is_paid_str = str(row.get('StatusPlatnosci', 'NIE')).strip().upper()
+                    is_paid = (is_paid_str == 'TAK')
+                    
+                    badge_html = ""
+                    if inv_no and inv_date_str:
+                        try:
+                            inv_date_obj = datetime.strptime(inv_date_str, "%Y-%m-%d").date()
+                            due_date = inv_date_obj + timedelta(days=term_days)
+                            today = datetime.now().date()
+                            delta = (due_date - today).days
+                            
+                            if is_paid:
+                                badge_html = f"<span style='color:#27AE60; font-size: 1.1rem;'>✅ OPŁACONA ({inv_no})</span>"
+                            elif delta < 0:
+                                badge_html = f"<span style='color:#FF3131; font-size: 1.1rem;'>⚠️ PO TERMINIE {abs(delta)} DNI! (Termin: {due_date.strftime('%d.%m.%Y')})</span>"
+                            elif delta == 0:
+                                badge_html = f"<span style='color:#E67E22; font-size: 1.1rem;'>⏳ TERMIN MIJA DZIŚ!</span>"
+                            else:
+                                badge_html = f"<span style='color:#F1C40F; font-size: 1.1rem;'>⏳ POZOSTAŁO {delta} DNI (Termin: {due_date.strftime('%d.%m.%Y')})</span>"
+                        except:
+                            badge_html = "<span style='color:#AAAAAA;'>BŁĄD DATY FAKTURY</span>"
+                    else:
+                        badge_html = "<span style='color:#AAAAAA; font-size: 1.1rem;'>⏳ BRAK FAKTURY</span>"
+                    
+                    # Rysowanie kafelka rozliczeniowego
+                    st.markdown(f"""
+                        <div class="billing-card">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                                <div>
+                                    <span style="color:#B58863; font-weight:bold; font-size:1.2rem;">{o_id}</span> | {row.get('Klient', '-')}
+                                    <br><span style="color:#888; font-size:0.8rem;">Stawka: {row.get('Stawka', '-')} | Status Operacyjny: {row.get('Status', '-')}</span>
+                                </div>
+                                <div style="text-align: right; font-weight: bold;">
+                                    {badge_html}
+                                </div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Formularz aktualizacji faktury
+                    with st.form(f"bill_form_{o_id}"):
+                        c1, c2, c3, c4, c5 = st.columns([2, 2, 1, 1, 1.5])
+                        
+                        new_inv_no = c1.text_input("NUMER FAKTURY", value=inv_no, key=f"inv_{o_id}")
+                        
+                        try: default_date = datetime.strptime(inv_date_str, "%Y-%m-%d").date() if inv_date_str else datetime.now().date()
+                        except: default_date = datetime.now().date()
+                        
+                        new_inv_date = c2.date_input("DATA WYSTAWIENIA", value=default_date, key=f"date_{o_id}")
+                        new_term = c3.number_input("TERMIN (DNI)", value=term_days, step=1, key=f"term_{o_id}")
+                        new_is_paid = c4.checkbox("✅ OPŁACONA", value=is_paid, key=f"paid_{o_id}")
+                        
+                        st.markdown("<div class='billing-btn'>", unsafe_allow_html=True)
+                        submitted = c5.form_submit_button("💾 ZAPISZ DANE")
+                        st.markdown("</div>", unsafe_allow_html=True)
+                        
+                        if submitted:
+                            status_val = "TAK" if new_is_paid else "NIE"
+                            if update_order_billing(o_id, new_inv_no, new_inv_date.strftime("%Y-%m-%d"), new_term, status_val):
+                                st.success("Zapisano dane faktury!"); st.rerun()
+                            else:
+                                st.error("Błąd zapisu. Upewnij się, że masz dodane kolumny M, N, O, P w arkuszu.")
+
+    # --------------------------------------------------------------------------
+    # WIDOK 4: BAZA / ARCHIWUM
+    # --------------------------------------------------------------------------
     elif mode == "🗄️ BAZA / ARCHIWUM":
         st.markdown("### 🗄️ REJESTR WSZYSTKICH ZLECEŃ")
         if df.empty:
             st.info("Baza zleceń jest pusta.")
         else:
             display_df = df.copy()
-            
-            # --- DODANY LICZNIK ZARCHIWIZOWANYCH ---
             col1, col2, col3, col4, col5 = st.columns(5)
             col1.metric("Wszystkich Zleceń", len(display_df))
             col2.metric("W Trasie", len(display_df[display_df['Status'] == 'W TRASIE']))
             col3.metric("Zakończone (Oczekujące)", len(display_df[display_df['Status'] == 'ZAKOŃCZONE']))
             col4.metric("Zarchiwizowane", len(display_df[display_df['Status'] == 'ZAMKNIĘTE']))
             col5.metric("Anulowane", len(display_df[display_df['Status'] == 'ANULOWANE']))
-            
             st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 if __name__ == "__main__":
