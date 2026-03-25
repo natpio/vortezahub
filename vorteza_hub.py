@@ -7,7 +7,7 @@ from datetime import datetime
 from google.oauth2.service_account import Credentials
 import gspread
 
-# --- 1. IMPORTY MODUŁÓW VORTEZA ---
+# --- 1. IMPORTY MODUŁÓW VORTEZA (Twoje oryginalne silniki) ---
 try:
     from vorteza_stack import run_stack
     from vorteza_flow import run_flow
@@ -23,16 +23,14 @@ st.set_page_config(
     page_icon="🕋"
 )
 
-# Funkcja pomocnicza do obrazów Base64 (zapobiega błędom wyświetlania)
+# Funkcja pomocnicza do obrazów Base64
 def get_base64_image(image_path):
     if os.path.exists(image_path):
-        try:
-            with open(image_path, "rb") as img_file:
-                return base64.b64encode(img_file.read()).decode()
-        except: return ""
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
     return ""
 
-# --- 3. DYNAMICZNY SILNIK STATYSTYK (TWOJA LOGIKA BIZNESOWA) ---
+# --- 3. DYNAMICZNY SILNIK STATYSTYK (Twoja pełna logika ranna) ---
 def get_dashboard_stats():
     """Pobiera realne dane z Google Sheets i lokalnych JSONów dla Dashboardu."""
     stats = {"vehicles": 0, "alerts": 0, "euro": 0.0, "skus": 0}
@@ -78,31 +76,27 @@ def inject_hub_theme():
                 background-size: cover; background-attachment: fixed; color: #FFFFFF; font-family: 'Montserrat', sans-serif; 
             }}
             
-            /* STABILNY PASEK BOCZNY */
             section[data-testid="stSidebar"] {{ 
                 background-color: rgba(3, 3, 3, 0.98) !important; 
                 border-right: 2px solid var(--v-copper); 
             }}
             
-            [data-testid="stSidebarNav"] span, 
-            [data-testid="stSidebar"] .stMarkdown p, 
-            [data-testid="stSidebar"] label {{
-                color: var(--v-copper) !important;
-                font-weight: 600 !important;
-                font-size: 1.05rem;
+            /* Miedziany sidebar */
+            [data-testid="stSidebarNav"] span, [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] label {{
+                color: var(--v-copper) !important; font-weight: 600 !important;
             }}
 
             h1, h2, h3 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 4px !important; font-weight: 700 !important; text-align: center; }}
             
-            /* INTERAKTYWNE KARTY DASHBOARDU */
+            /* INTERAKTYWNE KARTY (Całe klikalne) */
             .module-container {{ position: relative; text-align: center; margin-bottom: 25px; }}
             .module-card {{
                 background: rgba(10, 10, 10, 0.9);
                 border: 2px solid var(--v-copper);
                 border-radius: 15px;
-                padding: 40px 10px;
+                padding: 50px 10px;
                 transition: 0.4s;
-                height: 290px;
+                height: 300px;
                 display: flex;
                 flex-direction: column;
                 justify-content: center;
@@ -113,20 +107,12 @@ def inject_hub_theme():
                 transform: translateY(-8px);
                 box-shadow: 0 15px 35px rgba(181, 136, 99, 0.5);
             }}
-            .module-card img {{ 
-                width: 140px; 
-                margin-bottom: 25px; 
-                filter: drop-shadow(0 0 10px rgba(181, 136, 99, 0.5)); 
-            }}
-            .module-card h3 {{ 
-                margin: 0; 
-                font-size: 1.9rem !important; 
-                letter-spacing: 6px !important; 
-            }}
+            .module-card img {{ width: 140px; margin-bottom: 25px; filter: drop-shadow(0 0 10px rgba(181, 136, 99, 0.5)); }}
+            .module-card h3 {{ margin: 0; font-size: 2rem !important; letter-spacing: 6px !important; }}
 
-            /* Przezroczysty przycisk na całą ramkę */
+            /* Nakładka przycisku Streamlit na kartę */
             .stButton button {{
-                position: absolute; top: 0; left: 0; width: 100%; height: 290px;
+                position: absolute; top: 0; left: 0; width: 100%; height: 300px;
                 background: transparent !important; border: none !important; color: transparent !important;
                 z-index: 10; cursor: pointer;
             }}
@@ -150,12 +136,10 @@ def main_hub():
         _, col, _ = st.columns([0.8, 2, 0.8])
         with col:
             logo_b64 = get_base64_image(os.path.join("assets", "logo_vorteza.jpg"))
-            if logo_b64:
-                st.markdown(f'<p style="text-align:center;"><img src="data:image/jpg;base64,{logo_b64}" width="280"></p>', unsafe_allow_html=True)
+            if logo_b64: st.markdown(f'<p style="text-align:center;"><img src="data:image/jpg;base64,{logo_b64}" width="280"></p>', unsafe_allow_html=True)
             
             video_path = os.path.join("assets", "video 1.mp4")
-            if os.path.exists(video_path):
-                st.video(video_path, autoplay=True, muted=True, loop=False)
+            if os.path.exists(video_path): st.video(video_path, autoplay=True, muted=True, loop=False)
             
             st.markdown("<h1 style='text-align:center;'>VORTEZA LOGIN</h1>", unsafe_allow_html=True)
             with st.form("ApexAuth"):
@@ -163,12 +147,12 @@ def main_hub():
                 if st.form_submit_button("VALIDATE ACCESS"):
                     if pwd_input == st.secrets["password"]:
                         st.session_state.global_auth = True
-                        st.session_state.username = st.secrets["USERS"].get("admin", "GOLIATH-OPERATOR")
+                        st.session_state.username = st.secrets["USERS"].get("admin", "NeonParrot821")
                         st.rerun()
-                    else: st.error("ACCESS DENIED: INVALID KEY")
+                    else: st.error("ACCESS DENIED")
         return
 
-    # --- PASEK BOCZNY (SIDEBAR) ---
+    # --- PASEK BOCZNY ---
     with st.sidebar:
         logo_side_b64 = get_base64_image(os.path.join("assets", "logo_vorteza.jpg"))
         if logo_side_b64:
@@ -177,7 +161,7 @@ def main_hub():
         st.markdown("<h2 style='text-align:center; margin-top: 0;'>VORTEZA</h2>", unsafe_allow_html=True)
         st.markdown("<p style='text-align:center;'><span class='v-status-glow'>● SYSTEM ONLINE</span></p>", unsafe_allow_html=True)
         
-        # MAPOWANIE NAZW DLA KOMPATYBILNOŚCI Z MODUŁAMI
+        # Nawigacja (Twoje oryginalne nazwy stanu)
         original_modes = ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"]
         display_to_original = {"DASHBOARD": original_modes[0], "STACK": original_modes[1], "FLOW": original_modes[2], "BASE": original_modes[3]}
         original_to_display = {v: k for k, v in display_to_original.items()}
@@ -203,7 +187,7 @@ def main_hub():
         st.markdown("<h1 style='text-align:center;'>MISSION CONTROL</h1>", unsafe_allow_html=True)
         st.markdown("---")
         
-        with st.spinner("Aktualizacja parametrów operacyjnych..."):
+        with st.spinner("Pobieranie statusu operacyjnego..."):
             s = get_dashboard_stats()
         
         c1, c2, c3, c4 = st.columns(4)
@@ -215,7 +199,7 @@ def main_hub():
 
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # SIATKA KLIKALNYCH KAFELKÓW (Z IKONAMI WEWNĄTRZ RAMKI)
+        # SIATKA KLIKALNYCH KAFELKÓW
         m1, m2, m3 = st.columns(3)
         i_stack = get_base64_image(os.path.join("assets", "icon_stack.png"))
         i_flow = get_base64_image(os.path.join("assets", "icon_flow.png"))
@@ -239,11 +223,16 @@ def main_hub():
 
         if s["alerts"] > 0:
             st.error(f"UWAGA: Wykryto {s['alerts']} usterki w module BASE. Wymagana weryfikacja.")
+        else:
+            st.success("Status floty: NOMINALNY. Wszystkie systemy sprawne.")
 
-    # Pozostałe moduły systemu
-    elif st.session_state.app_mode == "PLANER 3D (STACK)": run_stack()
-    elif st.session_state.app_mode == "FINANSE (FLOW)": run_flow()
-    elif st.session_state.app_mode == "FLOTA (BASE)": run_base()
+    # --- URUCHAMIANIE TWOICH SILNIKÓW (Pełna kompatybilność) ---
+    elif st.session_state.app_mode == "PLANER 3D (STACK)": 
+        run_stack()
+    elif st.session_state.app_mode == "FINANSE (FLOW)": 
+        run_flow()
+    elif st.session_state.app_mode == "FLOTA (BASE)": 
+        run_base()
 
 if __name__ == "__main__":
     main_hub()
