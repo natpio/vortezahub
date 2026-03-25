@@ -12,8 +12,9 @@ try:
     from vorteza_stack import run_stack
     from vorteza_flow import run_flow
     from vorteza_base import run_base
+    from vorteza_core import run_core # NOWY MODUŁ!
 except ImportError as e:
-    st.error(f"KRYTYCZNY BŁĄD IMPORTU: Upewnij się, że pliki vorteza_stack.py, vorteza_flow.py i vorteza_base.py znajdują się w głównym folderze. Szczegóły: {e}")
+    st.error(f"KRYTYCZNY BŁĄD IMPORTU: Upewnij się, że pliki vorteza_stack.py, vorteza_flow.py, vorteza_base.py i vorteza_core.py znajdują się w folderze. Szczegóły: {e}")
 
 # --- 2. KONFIGURACJA APEX ULTIMATE PLUS ---
 st.set_page_config(
@@ -35,10 +36,7 @@ def get_base64_of_bin_file(bin_file):
 
 # --- 3. DYNAMICZNY SILNIK STATYSTYK (LIVE DATA) ---
 def get_dashboard_stats():
-    """Pobiera realne dane z Google Sheets i lokalnych JSONów dla Dashboardu."""
     stats = {"vehicles": 0, "alerts": 0, "euro": 0.0, "skus": 0}
-    
-    # Dane z Google Sheets (BASE)
     try:
         creds = Credentials.from_service_account_info(
             st.secrets["GCP_SERVICE_ACCOUNT"],
@@ -52,7 +50,6 @@ def get_dashboard_stats():
             stats["alerts"] = len(df_base[df_base['Wynik Kontroli'].astype(str).str.contains("ALERT", na=False)])
     except: pass
 
-    # Dane z lokalnych plików JSON (FLOW i STACK)
     try:
         if os.path.exists(os.path.join("data", "config.json")):
             with open(os.path.join("data", "config.json"), "r", encoding="utf-8") as f:
@@ -95,7 +92,6 @@ def inject_hub_theme():
             .stButton>button {{ background-color: rgba(10,10,10,0.8) !important; color: var(--v-copper) !important; border: 1px solid var(--v-copper) !important; width: 100%; transition: 0.4s; }}
             .stButton>button:hover {{ background-color: var(--v-copper) !important; color: black !important; }}
             
-            /* Kafelki modułów - dodano margines dolny oddzielający przycisk */
             .module-card {{ 
                 background: rgba(10, 10, 10, 0.75); 
                 border: 1px solid rgba(181, 136, 99, 0.4); 
@@ -107,43 +103,24 @@ def inject_hub_theme():
                 margin-bottom: 15px;
             }}
             
-            /* Poprawa czytelności metryk (liczb na pulpicie) */
-            [data-testid="stMetricLabel"] p {{
-                color: var(--v-copper) !important;
-                font-weight: 700 !important;
-                letter-spacing: 1px !important;
-                text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
-            }}
-            [data-testid="stMetricValue"] div {{
-                color: #FFFFFF !important;
-                font-family: 'JetBrains Mono', monospace !important;
-                text-shadow: 2px 2px 5px rgba(0,0,0,0.9);
-            }}
-            [data-testid="stMetricDelta"] div {{
-                text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
-            }}
+            [data-testid="stMetricLabel"] p {{ color: var(--v-copper) !important; font-weight: 700 !important; letter-spacing: 1px !important; text-shadow: 1px 1px 3px rgba(0,0,0,0.9); }}
+            [data-testid="stMetricValue"] div {{ color: #FFFFFF !important; font-family: 'JetBrains Mono', monospace !important; text-shadow: 2px 2px 5px rgba(0,0,0,0.9); }}
+            [data-testid="stMetricDelta"] div {{ text-shadow: 1px 1px 3px rgba(0,0,0,0.9); }}
         </style>
     """, unsafe_allow_html=True)
 
 # --- CALLBACK NAWIGACYJNY ---
 def navigate_to(page_name):
-    """Bezpieczna funkcja aktualizująca stan sesji dla nawigacji."""
     st.session_state.active_module = page_name
 
 # --- 5. GŁÓWNA LOGIKA HUB-A ---
 def main_hub():
     inject_hub_theme()
     
-    # --- INICJALIZACJA SESJI ---
-    if "global_auth" not in st.session_state: 
-        st.session_state.global_auth = False
-    if "username" not in st.session_state: 
-        st.session_state.username = "UNAUTHORIZED"
-        
-    if "active_module" not in st.session_state:
-        st.session_state.active_module = "PULPIT (DASHBOARD)"
+    if "global_auth" not in st.session_state: st.session_state.global_auth = False
+    if "username" not in st.session_state: st.session_state.username = "UNAUTHORIZED"
+    if "active_module" not in st.session_state: st.session_state.active_module = "PULPIT (DASHBOARD)"
 
-    # --- EKRAN LOGOWANIA Z VIDEO ---
     if not st.session_state.global_auth:
         _, col, _ = st.columns([0.8, 2, 0.8])
         with col:
@@ -164,7 +141,6 @@ def main_hub():
                     else: st.error("ACCESS DENIED: INVALID KEY")
         return
 
-    # --- DYNAMICZNE UKRYWANIE PASKA BOCZNEGO NA PULPICIE ---
     if st.session_state.active_module == "PULPIT (DASHBOARD)":
         st.markdown("""
             <style>
@@ -173,7 +149,6 @@ def main_hub():
             </style>
         """, unsafe_allow_html=True)
     else:
-        # --- PASEK BOCZNY TYLKO DLA MODUŁÓW (Z LOGO I IKONAMI) ---
         with st.sidebar:
             logo_path = os.path.join("assets", "logo_vorteza.png")
             if os.path.exists(logo_path):
@@ -184,7 +159,6 @@ def main_hub():
             st.markdown("<div style='text-align:center;'><span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span></div>", unsafe_allow_html=True)
             st.divider()
             
-            # --- ZMIENIONY PRZYCISK DASHBOARD (home.jpg) ---
             c1, c2 = st.columns([1, 4])
             with c1:
                 icon_path_home = os.path.join("assets", "home.jpg")
@@ -193,6 +167,19 @@ def main_hub():
                 st.button("PULPIT (DASHBOARD)", key="sb_nav_dash", on_click=navigate_to, args=("PULPIT (DASHBOARD)",), use_container_width=True)
                 
             st.markdown("<br>", unsafe_allow_html=True)
+            
+            # --- LINK DO NOWEGO MODUŁU W PASKU ---
+            c1, c2 = st.columns([1, 4])
+            with c1:
+                st.markdown("""
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 100%; filter: drop-shadow(0px 0px 3px #B58863);">
+                    <path d="M12 2L3 7L12 12L21 7L12 2Z" stroke="#B58863" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M3 12L12 17L21 12" stroke="#B58863" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M3 17L12 22L21 17" stroke="#B58863" stroke-width="2" stroke-linejoin="round"/>
+                </svg>
+                """, unsafe_allow_html=True)
+            with c2:
+                st.button("ZLECENIA (CORE)", key="sb_nav_core", on_click=navigate_to, args=("ZLECENIA (CORE)",), use_container_width=True)
             
             c1, c2 = st.columns([1, 4])
             with c1:
@@ -223,7 +210,6 @@ def main_hub():
                 st.session_state.username = "UNAUTHORIZED"
                 st.rerun()
 
-    # --- ROUTING (PRZEŁĄCZANIE MODUŁÓW) ---
     if st.session_state.active_module == "PULPIT (DASHBOARD)":
         st.markdown("<h1>DASHBOARD</h1>", unsafe_allow_html=True)
         
@@ -248,59 +234,48 @@ def main_hub():
         
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # --- ZARZĄDZANIE MODUŁAMI (KAFELKI W PEŁNI HTML) ---
-        m1, m2, m3 = st.columns(3)
+        # --- ZARZĄDZANIE MODUŁAMI (TERAZ 4 KOLUMNY) ---
+        m0, m1, m2, m3 = st.columns(4)
         
+        with m0:
+            st.markdown("""
+                <div class='module-card'>
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 45%; max-width: 150px; display: block; margin: 0 auto; filter: drop-shadow(0px 0px 10px rgba(181,136,99,0.5));">
+                        <path d="M12 2L3 7L12 12L21 7L12 2Z" stroke="#B58863" stroke-width="1.5" stroke-linejoin="round"/>
+                        <path d="M3 12L12 17L21 12" stroke="#B58863" stroke-width="1.5" stroke-linejoin="round"/>
+                        <path d="M3 17L12 22L21 17" stroke="#B58863" stroke-width="1.5" stroke-linejoin="round"/>
+                    </svg>
+                    <h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>ZLECENIA</h4>
+                </div>
+            """, unsafe_allow_html=True)
+            st.button("URUCHOM CORE", key="btn_go_core", on_click=navigate_to, args=("ZLECENIA (CORE)",), use_container_width=True)
+
         with m1:
             icon_b64 = get_base64_of_bin_file(os.path.join("assets", "icon_stack.png"))
             img_html = f"<img src='data:image/png;base64,{icon_b64}' style='width: 45%; max-width: 150px; display: block; margin: 0 auto;'/>" if icon_b64 else ""
-            
-            st.markdown(f"""
-                <div class='module-card'>
-                    {img_html}
-                    <h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>PLANER 3D</h4>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f"<div class='module-card'>{img_html}<h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>PLANER 3D</h4></div>", unsafe_allow_html=True)
             st.button("URUCHOM STACK", key="btn_go_stack", on_click=navigate_to, args=("PLANER 3D (STACK)",), use_container_width=True)
 
         with m2:
             icon_b64 = get_base64_of_bin_file(os.path.join("assets", "icon_flow.png"))
             img_html = f"<img src='data:image/png;base64,{icon_b64}' style='width: 45%; max-width: 150px; display: block; margin: 0 auto;'/>" if icon_b64 else ""
-            
-            st.markdown(f"""
-                <div class='module-card'>
-                    {img_html}
-                    <h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>FINANSE</h4>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f"<div class='module-card'>{img_html}<h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>FINANSE</h4></div>", unsafe_allow_html=True)
             st.button("URUCHOM FLOW", key="btn_go_flow", on_click=navigate_to, args=("FINANSE (FLOW)",), use_container_width=True)
             
         with m3:
             icon_b64 = get_base64_of_bin_file(os.path.join("assets", "icon_base.png"))
             img_html = f"<img src='data:image/png;base64,{icon_b64}' style='width: 45%; max-width: 150px; display: block; margin: 0 auto;'/>" if icon_b64 else ""
-            
-            st.markdown(f"""
-                <div class='module-card'>
-                    {img_html}
-                    <h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>FLOTA</h4>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f"<div class='module-card'>{img_html}<h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>FLOTA</h4></div>", unsafe_allow_html=True)
             st.button("URUCHOM BASE", key="btn_go_base", on_click=navigate_to, args=("FLOTA (BASE)",), use_container_width=True)
             
-            # KOMUNIKAT ALERTU 
             st.markdown("<br>", unsafe_allow_html=True)
-            if s["alerts"] > 0:
-                st.error(f"UWAGA: Wykryto {s['alerts']} usterki. Wymagana weryfikacja.")
-            else:
-                st.success("Status: NOMINALNY. System sprawny.")
+            if s["alerts"] > 0: st.error(f"UWAGA: Wykryto {s['alerts']} usterki. Wymagana weryfikacja.")
+            else: st.success("Status: NOMINALNY. System sprawny.")
 
-    # --- WŁAŚCIWE WYWOŁANIA MODUŁÓW ---
-    elif st.session_state.active_module == "PLANER 3D (STACK)": 
-        run_stack()
-    elif st.session_state.active_module == "FINANSE (FLOW)": 
-        run_flow()
-    elif st.session_state.active_module == "FLOTA (BASE)": 
-        run_base()
+    elif st.session_state.active_module == "ZLECENIA (CORE)": run_core()
+    elif st.session_state.active_module == "PLANER 3D (STACK)": run_stack()
+    elif st.session_state.active_module == "FINANSE (FLOW)": run_flow()
+    elif st.session_state.active_module == "FLOTA (BASE)": run_base()
 
 if __name__ == "__main__":
     main_hub()
