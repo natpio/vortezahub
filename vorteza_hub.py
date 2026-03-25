@@ -65,52 +65,49 @@ def inject_hub_theme():
     # Pobieranie tła z folderu assets
     bg_path = os.path.join("assets", "tlo_hub_2.jpg")
     bg_img = get_base64_image(bg_path)
-    bg_style = ""
+    
     if bg_img:
-        bg_style = f"""
-            background-image: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url("data:image/jpg;base64,{{bg_img}}");
-            background-size: cover;
-            background-attachment: fixed;
-        """
-
-    st.markdown(f"""
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&family=JetBrains+Mono&display=swap');
-            :root {{ --v-copper: #B58863; --v-dark: #060606; }}
-            
-            .stApp {{ 
-                {bg_style}
-                color: #FFFFFF; 
-                font-family: 'Montserrat', sans-serif; 
-            }}
-            
-            section[data-testid="stSidebar"] {{ 
-                background-color: rgba(3, 3, 3, 0.9) !important; 
-                border-right: 1px solid rgba(181, 136, 99, 0.3); 
-                width: 350px !important; 
-            }}
-            
-            .v-status-glow {{ color: #00FF41; text-shadow: 0 0 10px #00FF41; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }}
-            h1, h2, h3 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 6px !important; font-weight: 700 !important; }}
-            
-            .stButton>button {{ 
-                background-color: transparent !important; 
-                color: var(--v-copper) !important; 
-                border: 1px solid var(--v-copper) !important; 
-                width: 100%; 
-                transition: 0.4s; 
-                font-weight: bold;
-            }}
-            .stButton>button:hover {{ background-color: var(--v-copper) !important; color: black !important; }}
-            
-            [data-testid="stForm"] {{
-                background-color: rgba(0, 0, 0, 0.8);
-                border: 1px solid var(--v-copper);
-                border-radius: 10px;
-                padding: 30px;
-            }}
-        </style>
-    """, unsafe_allow_html=True)
+        # Poprawiona składnia f-stringa (pojedyncze nawiasy dla zmiennej bg_img)
+        st.markdown(f"""
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&family=JetBrains+Mono&display=swap');
+                :root {{ --v-copper: #B58863; --v-dark: #060606; }}
+                
+                .stApp {{ 
+                    background-image: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url("data:image/jpg;base64,{bg_img}");
+                    background-size: cover;
+                    background-attachment: fixed;
+                    color: #FFFFFF; 
+                    font-family: 'Montserrat', sans-serif; 
+                }}
+                
+                section[data-testid="stSidebar"] {{ 
+                    background-color: rgba(3, 3, 3, 0.9) !important; 
+                    border-right: 1px solid rgba(181, 136, 99, 0.3); 
+                    width: 350px !important; 
+                }}
+                
+                .v-status-glow {{ color: #00FF41; text-shadow: 0 0 10px #00FF41; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }}
+                h1, h2, h3 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 6px !important; font-weight: 700 !important; }}
+                
+                .stButton>button {{ 
+                    background-color: transparent !important; 
+                    color: var(--v-copper) !important; 
+                    border: 1px solid var(--v-copper) !important; 
+                    width: 100%; 
+                    transition: 0.4s; 
+                    font-weight: bold;
+                }}
+                .stButton>button:hover {{ background-color: var(--v-copper) !important; color: black !important; }}
+                
+                [data-testid="stForm"] {{
+                    background-color: rgba(0, 0, 0, 0.8);
+                    border: 1px solid var(--v-copper);
+                    border-radius: 10px;
+                    padding: 30px;
+                }}
+            </style>
+        """, unsafe_allow_html=True)
 
 # --- 5. GŁÓWNA LOGIKA HUB-A ---
 def main_hub():
@@ -121,20 +118,19 @@ def main_hub():
     if "username" not in st.session_state: 
         st.session_state.username = "UNAUTHORIZED"
 
-    # --- EKRAN LOGOWANIA Z VIDEO (LOOP=FALSE) ---
+    # --- EKRAN LOGOWANIA Z VIDEO ---
     if not st.session_state.global_auth:
         _, col, _ = st.columns([0.8, 2, 0.8])
         with col:
             st.markdown("<br><br>", unsafe_allow_html=True)
             
-            # Logo z folderu assets
             logo_path = os.path.join("assets", "logo_vorteza.jpg")
             if os.path.exists(logo_path):
                 st.image(logo_path, width=250)
 
-            # Video z folderu assets - odtwarzane tylko raz
             video_path = os.path.join("assets", "video 1.mp4")
             if os.path.exists(video_path):
+                # loop=False zapobiega zapętleniu
                 st.video(video_path, autoplay=True, muted=True, loop=False)
             
             st.markdown("<h1 style='text-align:center;'>VORTEZA LOGIN</h1>", unsafe_allow_html=True)
@@ -159,8 +155,9 @@ def main_hub():
         st.divider()
         app_mode = st.radio("MODUŁY SYSTEMOWE", ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"])
         st.divider()
-        st.markdown(f"**OPERATOR:** {{st.session_state.username}}")
-        st.markdown(f"**CZAS:** {{datetime.now().strftime('%H:%M:%S')}}")
+        # Poprawione wyświetlanie operatora i czasu
+        st.markdown(f"**OPERATOR:** {st.session_state.username}")
+        st.markdown(f"**CZAS:** {datetime.now().strftime('%H:%M:%S')}")
         if st.button("TERMINATE SESSION"):
             st.session_state.global_auth = False
             st.session_state.username = "UNAUTHORIZED"
@@ -168,10 +165,9 @@ def main_hub():
 
     # --- ROUTING (PRZEŁĄCZANIE MODUŁÓW) ---
     if app_mode == "PULPIT (DASHBOARD)":
-        # Baner z folderu assets - wyśrodkowany i mniejszy
         banner_path = os.path.join("assets", "baner 1.jpg")
         if os.path.exists(banner_path):
-            _, mid_col, _ = st.columns([1, 2, 1]) # Ograniczenie szerokości baneru
+            _, mid_col, _ = st.columns([1, 2, 1])
             with mid_col:
                 st.image(banner_path, use_column_width=True)
             
@@ -184,12 +180,12 @@ def main_hub():
         c1.metric("POJAZDY W SYSTEMIE", s["vehicles"])
         a_color = "inverse" if s["alerts"] > 0 else "normal"
         c2.metric("AKTYWNE ALERTY", s["alerts"], delta=s["alerts"], delta_color=a_color)
-        c3.metric("KURS EURO (V)", f"{{s['euro']}} PLN")
+        c3.metric("KURS EURO (V)", f"{s['euro']} PLN")
         c4.metric("BAZA SKU", s["skus"])
         
         st.markdown("<br>", unsafe_allow_html=True)
         if s["alerts"] > 0:
-            st.error(f"UWAGA: Wykryto {{s['alerts']}} usterki w module BASE. Wymagana weryfikacja.")
+            st.error(f"UWAGA: Wykryto {s['alerts']} usterki w module BASE. Wymagana weryfikacja.")
         else:
             st.success("Status floty: NOMINALNY. Wszystkie systemy sprawne.")
 
