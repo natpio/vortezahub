@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import os
 import pandas as pd
+import base64
 from datetime import datetime
 from google.oauth2.service_account import Credentials
 import gspread
@@ -21,6 +22,16 @@ st.set_page_config(
     initial_sidebar_state="expanded",
     page_icon="🕋"
 )
+
+# --- FUNKCJA POMOCNICZA DLA TŁA B64 ---
+def get_base64_of_bin_file(bin_file):
+    try:
+        if os.path.exists(bin_file):
+            with open(bin_file, 'rb') as f:
+                return base64.b64encode(f.read()).decode()
+        return ""
+    except:
+        return ""
 
 # --- 3. DYNAMICZNY SILNIK STATYSTYK (LIVE DATA) ---
 def get_dashboard_stats():
@@ -43,12 +54,12 @@ def get_dashboard_stats():
 
     # Dane z lokalnych plików JSON (FLOW i STACK)
     try:
-        if os.path.exists("data/config.json"):
-            with open("data/config.json", "r", encoding="utf-8") as f:
+        if os.path.exists(os.path.join("data", "config.json")):
+            with open(os.path.join("data", "config.json"), "r", encoding="utf-8") as f:
                 stats["euro"] = json.load(f).get("EURO_RATE", 0.0)
         
-        if os.path.exists("data/products.json"):
-            with open("data/products.json", "r", encoding="utf-8") as f:
+        if os.path.exists(os.path.join("data", "products.json")):
+            with open(os.path.join("data", "products.json"), "r", encoding="utf-8") as f:
                 stats["skus"] = len(json.load(f))
     except: pass
     
@@ -56,16 +67,45 @@ def get_dashboard_stats():
 
 # --- 4. SILNIK WIZUALNY VORTEZA ---
 def inject_hub_theme():
-    st.markdown("""
+    bg_path = os.path.join("assets", "tlo_hub_2.jpg")
+    bg_b64 = get_base64_of_bin_file(bg_path)
+    
+    bg_style = ""
+    if bg_b64:
+        # Lekki ciemny gradient nakładany na obrazek, by litery były czytelne
+        bg_style = f"""
+        .stApp {{
+            background: linear-gradient(rgba(6, 6, 6, 0.85), rgba(6, 6, 6, 0.85)), 
+                        url("data:image/jpeg;base64,{bg_b64}") !important;
+            background-size: cover !important;
+            background-attachment: fixed !important;
+        }}
+        """
+    else:
+        bg_style = ".stApp { background-color: var(--v-dark); }"
+
+    st.markdown(f"""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&family=JetBrains+Mono&display=swap');
-            :root { --v-copper: #B58863; --v-dark: #060606; }
-            .stApp { background-color: var(--v-dark); color: #FFFFFF; font-family: 'Montserrat', sans-serif; }
-            section[data-testid="stSidebar"] { background-color: #030303 !important; border-right: 1px solid rgba(181, 136, 99, 0.3); width: 350px !important; }
-            .v-status-glow { color: #00FF41; text-shadow: 0 0 10px #00FF41; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
-            h1, h2, h3 { color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 6px !important; font-weight: 700 !important; }
-            .stButton>button { background-color: transparent !important; color: var(--v-copper) !important; border: 1px solid var(--v-copper) !important; width: 100%; transition: 0.4s; }
-            .stButton>button:hover { background-color: var(--v-copper) !important; color: black !important; }
+            :root {{ --v-copper: #B58863; --v-dark: #060606; }}
+            {bg_style}
+            .stApp {{ color: #FFFFFF; font-family: 'Montserrat', sans-serif; }}
+            section[data-testid="stSidebar"] {{ background-color: rgba(3, 3, 3, 0.95) !important; border-right: 1px solid rgba(181, 136, 99, 0.3); width: 350px !important; backdrop-filter: blur(10px); }}
+            .v-status-glow {{ color: #00FF41; text-shadow: 0 0 10px #00FF41; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }}
+            h1, h2, h3, h4 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 6px !important; font-weight: 700 !important; }}
+            .stButton>button {{ background-color: rgba(10,10,10,0.8) !important; color: var(--v-copper) !important; border: 1px solid var(--v-copper) !important; width: 100%; transition: 0.4s; }}
+            .stButton>button:hover {{ background-color: var(--v-copper) !important; color: black !important; }}
+            
+            /* Style dla dedykowanych kafelków nawigacyjnych na pulpicie */
+            .module-card {{ 
+                background: rgba(10, 10, 10, 0.75); 
+                border: 1px solid rgba(181, 136, 99, 0.4); 
+                border-top: 3px solid #B58863; 
+                padding: 20px; 
+                border-radius: 8px; 
+                text-align: center; 
+                backdrop-filter: blur(5px); 
+            }}
         </style>
     """, unsafe_allow_html=True)
 
@@ -73,20 +113,22 @@ def inject_hub_theme():
 def main_hub():
     inject_hub_theme()
     
-    # --- INICJALIZACJA SESJI ---
+    # --- INICJALIZACJA SESJI DLA BEZPIECZNEJ NAWIGACJI ---
     if "global_auth" not in st.session_state: 
         st.session_state.global_auth = False
     if "username" not in st.session_state: 
         st.session_state.username = "UNAUTHORIZED"
+    if "current_page" not in st.session_state:
+        st.session_state.current_page = "PULPIT (DASHBOARD)"
 
     # --- EKRAN LOGOWANIA Z VIDEO ---
     if not st.session_state.global_auth:
         _, col, _ = st.columns([0.8, 2, 0.8])
         with col:
-            # Implementacja video promocyjnego
+            # Implementacja video promocyjnego (odtworzy się tylko raz - loop=False)
             video_path = os.path.join("assets", "video 1.mp4")
             if os.path.exists(video_path):
-                st.video(video_path, autoplay=True, muted=True, loop=True)
+                st.video(video_path, autoplay=True, muted=True, loop=False)
             else:
                 st.markdown("<br><br>", unsafe_allow_html=True)
             
@@ -101,12 +143,18 @@ def main_hub():
                     else: st.error("ACCESS DENIED: INVALID KEY")
         return
 
-    # --- PASEK BOCZNY (NAWIGACJA) ---
+    # --- PASEK BOCZNY (NAWIGACJA Z SYNC. STANEM SESJI) ---
     with st.sidebar:
         st.markdown("<h2 style='letter-spacing:10px;'>VORTEZA</h2>", unsafe_allow_html=True)
         st.markdown("<span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span>", unsafe_allow_html=True)
         st.divider()
-        app_mode = st.radio("MODUŁY SYSTEMOWE", ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"])
+        
+        # Klucz session_state "current_page" odpowiada za synchronizację z guzikami na pulpicie
+        st.radio(
+            "MODUŁY SYSTEMOWE", 
+            ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"],
+            key="current_page"
+        )
         st.divider()
         st.markdown(f"**OPERATOR:** {st.session_state.username}")
         st.markdown(f"**CZAS:** {datetime.now().strftime('%H:%M:%S')}")
@@ -116,8 +164,16 @@ def main_hub():
             st.rerun()
 
     # --- ROUTING (PRZEŁĄCZANIE MODUŁÓW) ---
-    if app_mode == "PULPIT (DASHBOARD)":
-        st.markdown("<h1>MISSION CONTROL</h1>", unsafe_allow_html=True)
+    if st.session_state.current_page == "PULPIT (DASHBOARD)":
+        st.markdown("<h1>DASHBOARD</h1>", unsafe_allow_html=True)
+        
+        # Baner (wycentrowany, ograniczona wielkość)
+        banner_path = os.path.join("assets", "baner 1.jpg")
+        if os.path.exists(banner_path):
+            _, b_col, _ = st.columns([1, 2, 1])
+            with b_col:
+                st.image(banner_path, use_container_width=True)
+                
         st.markdown("---")
         with st.spinner("Pobieranie statusu operacyjnego..."):
             s = get_dashboard_stats()
@@ -138,11 +194,56 @@ def main_hub():
         else:
             st.success("Status floty: NOMINALNY. Wszystkie systemy sprawne.")
 
-    elif app_mode == "PLANER 3D (STACK)": 
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        
+        # --- ZARZĄDZANIE MODUŁAMI (KAFELKI NAWIGACYJNE Z IKONAMI) ---
+        m1, m2, m3 = st.columns(3)
+        
+        with m1:
+            st.markdown("<div class='module-card'>", unsafe_allow_html=True)
+            _, icon_col, _ = st.columns([1, 1.5, 1])
+            with icon_col:
+                icon_path_stack = os.path.join("assets", "icon_stack.png")
+                if os.path.exists(icon_path_stack):
+                    st.image(icon_path_stack, use_container_width=True)
+            st.markdown("<h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>PLANER 3D</h4>", unsafe_allow_html=True)
+            if st.button("URUCHOM STACK", key="btn_go_stack"):
+                st.session_state.current_page = "PLANER 3D (STACK)"
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with m2:
+            st.markdown("<div class='module-card'>", unsafe_allow_html=True)
+            _, icon_col, _ = st.columns([1, 1.5, 1])
+            with icon_col:
+                icon_path_flow = os.path.join("assets", "icon_flow.png")
+                if os.path.exists(icon_path_flow):
+                    st.image(icon_path_flow, use_container_width=True)
+            st.markdown("<h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>FINANSE</h4>", unsafe_allow_html=True)
+            if st.button("URUCHOM FLOW", key="btn_go_flow"):
+                st.session_state.current_page = "FINANSE (FLOW)"
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+        with m3:
+            st.markdown("<div class='module-card'>", unsafe_allow_html=True)
+            _, icon_col, _ = st.columns([1, 1.5, 1])
+            with icon_col:
+                icon_path_base = os.path.join("assets", "icon_base.png")
+                if os.path.exists(icon_path_base):
+                    st.image(icon_path_base, use_container_width=True)
+            st.markdown("<h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>FLOTA</h4>", unsafe_allow_html=True)
+            if st.button("URUCHOM BASE", key="btn_go_base"):
+                st.session_state.current_page = "FLOTA (BASE)"
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- WŁAŚCIWE WYWOŁANIA MODUŁÓW ---
+    elif st.session_state.current_page == "PLANER 3D (STACK)": 
         run_stack()
-    elif app_mode == "FINANSE (FLOW)": 
+    elif st.session_state.current_page == "FINANSE (FLOW)": 
         run_flow()
-    elif app_mode == "FLOTA (BASE)": 
+    elif st.session_state.current_page == "FLOTA (BASE)": 
         run_base()
 
 if __name__ == "__main__":
