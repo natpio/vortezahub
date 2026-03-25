@@ -67,7 +67,6 @@ def inject_hub_theme():
     bg_img = get_base64_image(bg_path)
     
     if bg_img:
-        # Poprawiona składnia f-stringa (pojedyncze nawiasy dla zmiennej bg_img)
         st.markdown(f"""
             <style>
                 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&family=JetBrains+Mono&display=swap');
@@ -81,12 +80,33 @@ def inject_hub_theme():
                     font-family: 'Montserrat', sans-serif; 
                 }}
                 
+                /* STYLIZACJA PASKA BOCZNEGO */
                 section[data-testid="stSidebar"] {{ 
                     background-color: rgba(3, 3, 3, 0.9) !important; 
-                    border-right: 1px solid rgba(181, 136, 99, 0.3); 
+                    border-right: 2px solid var(--v-copper); 
                     width: 350px !important; 
                 }}
                 
+                /* Miedziany tekst dla wszystkich elementów w sidebarze */
+                section[data-testid="stSidebar"] {{
+                    color: var(--v-copper) !important;
+                }}
+                
+                /* Etykiety i tekst w sidebarze */
+                section[data-testid="stSidebar"] .stMarkdown, 
+                section[data-testid="stSidebar"] label, 
+                section[data-testid="stSidebar"] p {{
+                    color: var(--v-copper) !important;
+                    font-weight: 500 !important;
+                }}
+
+                /* Miedziany kolor dla Radio Buttonów w sidebarze */
+                section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {{
+                    color: var(--v-copper) !important;
+                    font-size: 1.1rem !important;
+                    letter-spacing: 2px;
+                }}
+
                 .v-status-glow {{ color: #00FF41; text-shadow: 0 0 10px #00FF41; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }}
                 h1, h2, h3 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 6px !important; font-weight: 700 !important; }}
                 
@@ -130,7 +150,6 @@ def main_hub():
 
             video_path = os.path.join("assets", "video 1.mp4")
             if os.path.exists(video_path):
-                # loop=False zapobiega zapętleniu
                 st.video(video_path, autoplay=True, muted=True, loop=False)
             
             st.markdown("<h1 style='text-align:center;'>VORTEZA LOGIN</h1>", unsafe_allow_html=True)
@@ -155,7 +174,6 @@ def main_hub():
         st.divider()
         app_mode = st.radio("MODUŁY SYSTEMOWE", ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"])
         st.divider()
-        # Poprawione wyświetlanie operatora i czasu
         st.markdown(f"**OPERATOR:** {st.session_state.username}")
         st.markdown(f"**CZAS:** {datetime.now().strftime('%H:%M:%S')}")
         if st.button("TERMINATE SESSION"):
