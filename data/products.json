@@ -17,7 +17,7 @@
   {"id": 16, "name": "P2 ESD 2,84 - STANDARD", "width": 110, "length": 60, "height": 80, "weight": 115, "canStack": true, "itemsPerCase": 8},
   {"id": 17, "name": "P2 ESD Corner - nonstandard", "width": 90, "length": 70, "height": 80, "weight": 104, "canStack": true, "itemsPerCase": 8},
   {"id": 18, "name": "P3.9 Yestech - STANDARD", "width": 114, "length": 60, "height": 80, "weight": 125, "canStack": true, "itemsPerCase": 10},
-  {"id": 19, "name": "P2.6 Yestech - INDOOR", "width": 117, "length": 64, "height": 76, "weight": 122, "canStack": true, "itemsPerCase": 10},
+  {"id": 19, "name": "P2.6 Yestech - INDOOR", "width": 117, "length": 60, "height": 76, "weight": 122, "canStack": true, "itemsPerCase": 10},
   {"id": 20, "name": "P2.6 Yestech - INDOOR CUBE", "width": 117, "length": 64, "height": 76, "weight": 122, "canStack": true, "itemsPerCase": 10},
   {"id": 21, "name": "P3 Yestech Corner - nonstandard", "width": 120, "length": 60, "height": 80, "weight": 113, "canStack": true, "itemsPerCase": 12},
   {"id": 22, "name": "P2.9 Yestech FLOOR - STANDARD", "width": 114, "length": 60, "height": 76, "weight": 142, "canStack": true, "itemsPerCase": 10},
