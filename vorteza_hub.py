@@ -109,14 +109,14 @@ def inject_hub_theme():
 
 # --- CALLBACK NAWIGACYJNY ---
 def navigate_to(page_name):
-    """Bezpieczna funkcja aktualizująca stan sesji przypisany do widgetu radio."""
+    """Bezpieczna funkcja aktualizująca stan sesji dla nawigacji."""
     st.session_state.current_page = page_name
 
 # --- 5. GŁÓWNA LOGIKA HUB-A ---
 def main_hub():
     inject_hub_theme()
     
-    # --- INICJALIZACJA SESJI DLA BEZPIECZNEJ NAWIGACJI ---
+    # --- INICJALIZACJA SESJI ---
     if "global_auth" not in st.session_state: 
         st.session_state.global_auth = False
     if "username" not in st.session_state: 
@@ -145,24 +145,62 @@ def main_hub():
                     else: st.error("ACCESS DENIED: INVALID KEY")
         return
 
-    # --- PASEK BOCZNY (NAWIGACJA Z SYNC. STANEM SESJI) ---
-    with st.sidebar:
-        st.markdown("<h2 style='letter-spacing:10px;'>VORTEZA</h2>", unsafe_allow_html=True)
-        st.markdown("<span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span>", unsafe_allow_html=True)
-        st.divider()
-        
-        st.radio(
-            "MODUŁY SYSTEMOWE", 
-            ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"],
-            key="current_page"
-        )
-        st.divider()
-        st.markdown(f"**OPERATOR:** {st.session_state.username}")
-        st.markdown(f"**CZAS:** {datetime.now().strftime('%H:%M:%S')}")
-        if st.button("TERMINATE SESSION"):
-            st.session_state.global_auth = False
-            st.session_state.username = "UNAUTHORIZED"
-            st.rerun()
+    # --- DYNAMICZNE UKRYWANIE PASKA BOCZNEGO NA PULPICIE ---
+    if st.session_state.current_page == "PULPIT (DASHBOARD)":
+        st.markdown("""
+            <style>
+                [data-testid="collapsedControl"] { display: none !important; }
+                section[data-testid="stSidebar"] { display: none !important; }
+            </style>
+        """, unsafe_allow_html=True)
+    else:
+        # --- PASEK BOCZNY TYLKO DLA MODUŁÓW (Z LOGO I IKONAMI) ---
+        with st.sidebar:
+            # Logo
+            logo_path = os.path.join("assets", "logo_vorteza.png")
+            if os.path.exists(logo_path):
+                st.image(logo_path, use_container_width=True)
+            else:
+                st.markdown("<h2 style='letter-spacing:10px; text-align:center;'>VORTEZA</h2>", unsafe_allow_html=True)
+                
+            st.markdown("<div style='text-align:center;'><span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span></div>", unsafe_allow_html=True)
+            st.divider()
+            
+            # Przycisk powrotu na Dashboard
+            st.button("🏠 PULPIT (DASHBOARD)", key="sb_nav_dash", on_click=navigate_to, args=("PULPIT (DASHBOARD)",), use_container_width=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Nawigacja do STACK
+            c1, c2 = st.columns([1, 4])
+            with c1:
+                icon_path_stack = os.path.join("assets", "icon_stack.png")
+                if os.path.exists(icon_path_stack): st.image(icon_path_stack)
+            with c2:
+                st.button("PLANER 3D (STACK)", key="sb_nav_stack", on_click=navigate_to, args=("PLANER 3D (STACK)",), use_container_width=True)
+            
+            # Nawigacja do FLOW
+            c1, c2 = st.columns([1, 4])
+            with c1:
+                icon_path_flow = os.path.join("assets", "icon_flow.png")
+                if os.path.exists(icon_path_flow): st.image(icon_path_flow)
+            with c2:
+                st.button("FINANSE (FLOW)", key="sb_nav_flow", on_click=navigate_to, args=("FINANSE (FLOW)",), use_container_width=True)
+            
+            # Nawigacja do BASE
+            c1, c2 = st.columns([1, 4])
+            with c1:
+                icon_path_base = os.path.join("assets", "icon_base.png")
+                if os.path.exists(icon_path_base): st.image(icon_path_base)
+            with c2:
+                st.button("FLOTA (BASE)", key="sb_nav_base", on_click=navigate_to, args=("FLOTA (BASE)",), use_container_width=True)
+
+            st.divider()
+            st.markdown(f"**OPERATOR:** {st.session_state.username}")
+            st.markdown(f"**CZAS:** {datetime.now().strftime('%H:%M:%S')}")
+            if st.button("TERMINATE SESSION", key="sb_logout"):
+                st.session_state.global_auth = False
+                st.session_state.username = "UNAUTHORIZED"
+                st.rerun()
 
     # --- ROUTING (PRZEŁĄCZANIE MODUŁÓW) ---
     if st.session_state.current_page == "PULPIT (DASHBOARD)":
