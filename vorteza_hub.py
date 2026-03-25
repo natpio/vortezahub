@@ -68,7 +68,7 @@ def inject_hub_theme():
     bg_style = ""
     if bg_img:
         bg_style = f"""
-            background-image: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url("data:image/jpg;base64,{bg_img}");
+            background-image: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url("data:image/jpg;base64,{{bg_img}}");
             background-size: cover;
             background-attachment: fixed;
         """
@@ -121,7 +121,7 @@ def main_hub():
     if "username" not in st.session_state: 
         st.session_state.username = "UNAUTHORIZED"
 
-    # --- EKRAN LOGOWANIA Z VIDEO ---
+    # --- EKRAN LOGOWANIA Z VIDEO (LOOP=FALSE) ---
     if not st.session_state.global_auth:
         _, col, _ = st.columns([0.8, 2, 0.8])
         with col:
@@ -132,7 +132,7 @@ def main_hub():
             if os.path.exists(logo_path):
                 st.image(logo_path, width=250)
 
-            # Video z folderu assets
+            # Video z folderu assets - odtwarzane tylko raz
             video_path = os.path.join("assets", "video 1.mp4")
             if os.path.exists(video_path):
                 st.video(video_path, autoplay=True, muted=True, loop=False)
@@ -159,8 +159,8 @@ def main_hub():
         st.divider()
         app_mode = st.radio("MODUŁY SYSTEMOWE", ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"])
         st.divider()
-        st.markdown(f"**OPERATOR:** {st.session_state.username}")
-        st.markdown(f"**CZAS:** {datetime.now().strftime('%H:%M:%S')}")
+        st.markdown(f"**OPERATOR:** {{st.session_state.username}}")
+        st.markdown(f"**CZAS:** {{datetime.now().strftime('%H:%M:%S')}}")
         if st.button("TERMINATE SESSION"):
             st.session_state.global_auth = False
             st.session_state.username = "UNAUTHORIZED"
@@ -168,10 +168,12 @@ def main_hub():
 
     # --- ROUTING (PRZEŁĄCZANIE MODUŁÓW) ---
     if app_mode == "PULPIT (DASHBOARD)":
-        # Baner z folderu assets
+        # Baner z folderu assets - wyśrodkowany i mniejszy
         banner_path = os.path.join("assets", "baner 1.jpg")
         if os.path.exists(banner_path):
-            st.image(banner_path, use_column_width=True)
+            _, mid_col, _ = st.columns([1, 2, 1]) # Ograniczenie szerokości baneru
+            with mid_col:
+                st.image(banner_path, use_column_width=True)
             
         st.markdown("<h1>MISSION CONTROL</h1>", unsafe_allow_html=True)
         st.markdown("---")
@@ -182,12 +184,12 @@ def main_hub():
         c1.metric("POJAZDY W SYSTEMIE", s["vehicles"])
         a_color = "inverse" if s["alerts"] > 0 else "normal"
         c2.metric("AKTYWNE ALERTY", s["alerts"], delta=s["alerts"], delta_color=a_color)
-        c3.metric("KURS EURO (V)", f"{s['euro']} PLN")
+        c3.metric("KURS EURO (V)", f"{{s['euro']}} PLN")
         c4.metric("BAZA SKU", s["skus"])
         
         st.markdown("<br>", unsafe_allow_html=True)
         if s["alerts"] > 0:
-            st.error(f"UWAGA: Wykryto {s['alerts']} usterki w module BASE. Wymagana weryfikacja.")
+            st.error(f"UWAGA: Wykryto {{s['alerts']}} usterki w module BASE. Wymagana weryfikacja.")
         else:
             st.success("Status floty: NOMINALNY. Wszystkie systemy sprawne.")
 
