@@ -109,8 +109,8 @@ def inject_hub_theme():
 
 # --- CALLBACK NAWIGACYJNY ---
 def navigate_to(page_name):
-    """Bezpieczna funkcja aktualizująca stan sesji dla nawigacji."""
-    st.session_state.current_page = page_name
+    """Bezpieczna funkcja aktualizująca stan sesji dla nawigacji (bez konfliktu z widgetami)."""
+    st.session_state.active_module = page_name
 
 # --- 5. GŁÓWNA LOGIKA HUB-A ---
 def main_hub():
@@ -121,8 +121,10 @@ def main_hub():
         st.session_state.global_auth = False
     if "username" not in st.session_state: 
         st.session_state.username = "UNAUTHORIZED"
-    if "current_page" not in st.session_state:
-        st.session_state.current_page = "PULPIT (DASHBOARD)"
+        
+    # NOWA, BEZPIECZNA ZMIENNA NAWIGACYJNA
+    if "active_module" not in st.session_state:
+        st.session_state.active_module = "PULPIT (DASHBOARD)"
 
     # --- EKRAN LOGOWANIA Z VIDEO ---
     if not st.session_state.global_auth:
@@ -146,7 +148,7 @@ def main_hub():
         return
 
     # --- DYNAMICZNE UKRYWANIE PASKA BOCZNEGO NA PULPICIE ---
-    if st.session_state.current_page == "PULPIT (DASHBOARD)":
+    if st.session_state.active_module == "PULPIT (DASHBOARD)":
         st.markdown("""
             <style>
                 [data-testid="collapsedControl"] { display: none !important; }
@@ -203,7 +205,7 @@ def main_hub():
                 st.rerun()
 
     # --- ROUTING (PRZEŁĄCZANIE MODUŁÓW) ---
-    if st.session_state.current_page == "PULPIT (DASHBOARD)":
+    if st.session_state.active_module == "PULPIT (DASHBOARD)":
         st.markdown("<h1>DASHBOARD</h1>", unsafe_allow_html=True)
         
         banner_path = os.path.join("assets", "baner 1.jpg")
@@ -270,11 +272,11 @@ def main_hub():
             st.markdown("</div>", unsafe_allow_html=True)
 
     # --- WŁAŚCIWE WYWOŁANIA MODUŁÓW ---
-    elif st.session_state.current_page == "PLANER 3D (STACK)": 
+    elif st.session_state.active_module == "PLANER 3D (STACK)": 
         run_stack()
-    elif st.session_state.current_page == "FINANSE (FLOW)": 
+    elif st.session_state.active_module == "FINANSE (FLOW)": 
         run_flow()
-    elif st.session_state.current_page == "FLOTA (BASE)": 
+    elif st.session_state.active_module == "FLOTA (BASE)": 
         run_base()
 
 if __name__ == "__main__":
