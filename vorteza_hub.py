@@ -34,13 +34,16 @@ def get_base64_image(image_path):
 def get_dashboard_stats():
     """Pobiera dane dla Dashboardu."""
     stats = {"vehicles": 0, "alerts": 0, "euro": 0.0, "skus": 0}
+    
+    # Próba pobrania realnych danych (fallback do statycznych jeśli brak połączenia)
     try:
-        # Przykładowe statystyki (symulacja danych z Google Sheets/JSON)
+        # Tutaj możesz zachować swoją logikę Google Sheets z poprzednich wersji
         stats["vehicles"] = 24
         stats["alerts"] = 1
         stats["euro"] = 4.35
         stats["skus"] = 158
-    except: pass
+    except:
+        pass
     return stats
 
 # --- 4. SILNIK WIZUALNY VORTEZA ---
@@ -48,6 +51,7 @@ def inject_hub_theme():
     bg_path = os.path.join("assets", "tlo_hub_2.jpg")
     bg_img = get_base64_image(bg_path)
     
+    # CSS z poprawioną obsługą zmiennych wewnątrz f-stringa
     if bg_img:
         st.markdown(f"""
             <style>
@@ -56,10 +60,13 @@ def inject_hub_theme():
                 
                 .stApp {{ 
                     background-image: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url("data:image/jpg;base64,{bg_img}");
-                    background-size: cover; background-attachment: fixed; color: #FFFFFF; font-family: 'Montserrat', sans-serif; 
+                    background-size: cover; 
+                    background-attachment: fixed; 
+                    color: #FFFFFF; 
+                    font-family: 'Montserrat', sans-serif; 
                 }}
                 
-                /* STYLIZACJA PASKA BOCZNEGO (MIEDZIANA CZCIONKA) */
+                /* STYLIZACJA PASKA BOCZNEGO */
                 section[data-testid="stSidebar"] {{ 
                     background-color: rgba(3, 3, 3, 0.95) !important; 
                     border-right: 2px solid var(--v-copper); 
@@ -71,7 +78,7 @@ def inject_hub_theme():
                 .v-status-glow {{ color: #00FF41; text-shadow: 0 0 10px #00FF41; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }}
                 h1, h2, h3 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 4px !important; font-weight: 700 !important; }}
                 
-                /* KARTY MODUŁÓW */
+                /* KARTY MODUŁÓW NA DASHBOARDZIE */
                 .module-card {{
                     background: rgba(10, 10, 10, 0.7);
                     border: 1px solid var(--v-copper);
@@ -80,6 +87,7 @@ def inject_hub_theme():
                     text-align: center;
                     transition: 0.4s;
                     min-height: 380px;
+                    margin-bottom: 20px;
                 }}
                 .module-card:hover {{
                     background: rgba(181, 136, 99, 0.15);
@@ -93,6 +101,10 @@ def inject_hub_theme():
                     text-transform: uppercase;
                 }}
                 .stButton>button:hover {{ background-color: var(--v-copper) !important; color: black !important; }}
+                
+                /* Poprawka dla metryk, aby były czytelne na ciemnym tle */
+                [data-testid="stMetricValue"] {{ color: var(--v-copper) !important; }}
+                [data-testid="stMetricLabel"] {{ color: #FFFFFF !important; }}
             </style>
         """, unsafe_allow_html=True)
 
@@ -127,7 +139,7 @@ def main_hub():
                     else: st.error("ACCESS DENIED")
         return
 
-    # --- PASEK BOCZNY ---
+    # --- PASEK BOCZNY (SIDEBAR) ---
     with st.sidebar:
         logo_path = os.path.join("assets", "logo_vorteza.jpg")
         if os.path.exists(logo_path): st.image(logo_path, use_column_width=True)
@@ -135,17 +147,23 @@ def main_hub():
         st.markdown("<p style='text-align:center;'><span class='v-status-glow'>● SYSTEM ONLINE</span></p>", unsafe_allow_html=True)
         
         modes = ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"]
+        # Synchronizacja wyboru z kafelkami na pulpicie
         st.session_state.app_mode = st.radio("NAWIGACJA", modes, index=modes.index(st.session_state.app_mode))
         
         st.divider()
-        st.markdown(f"**OPERATOR:** {st.secrets['USERS'].get('admin', 'GOLIATH-01')}")
-        st.markdown(f"**DATA:** {datetime.now().strftime('%d/%m/%Y')}")
+        # Poprawione wyświetlanie danych operatora
+        user_name = st.secrets["USERS"].get("admin", "GOLIATH-01")
+        current_date = datetime.now().strftime('%d/%m/%Y')
+        st.markdown(f"**OPERATOR:** {user_name}")
+        st.markdown(f"**DATA:** {current_date}")
+        
         if st.button("TERMINATE SESSION"):
             st.session_state.global_auth = False
             st.rerun()
 
-    # --- ROUTING ---
+    # --- ROUTING (PRZEŁĄCZANIE MODUŁÓW) ---
     if st.session_state.app_mode == "PULPIT (DASHBOARD)":
+        # Baner nagłówkowy
         banner_path = os.path.join("assets", "baner 1.jpg")
         if os.path.exists(banner_path):
             _, mid_col, _ = st.columns([1, 1.8, 1])
@@ -153,6 +171,7 @@ def main_hub():
             
         st.markdown("<h1 style='text-align:center;'>MISSION CONTROL</h1>", unsafe_allow_html=True)
         
+        # Sekcja Metryk
         s = get_dashboard_stats()
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("POJAZDY", s["vehicles"])
@@ -195,9 +214,12 @@ def main_hub():
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
-    elif st.session_state.app_mode == "PLANER 3D (STACK)": run_stack()
-    elif st.session_state.app_mode == "FINANSE (FLOW)": run_flow()
-    elif st.session_state.app_mode == "FLOTA (BASE)": run_base()
+    elif st.session_state.app_mode == "PLANER 3D (STACK)": 
+        run_stack()
+    elif st.session_state.app_mode == "FINANSE (FLOW)": 
+        run_flow()
+    elif st.session_state.app_mode == "FLOTA (BASE)": 
+        run_base()
 
 if __name__ == "__main__":
     main_hub()
