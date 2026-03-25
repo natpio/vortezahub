@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import os
 import pandas as pd
+import base64
 from datetime import datetime
 from google.oauth2.service_account import Credentials
 import gspread
@@ -12,60 +13,105 @@ try:
     from vorteza_flow import run_flow
     from vorteza_base import run_base
 except ImportError as e:
-    st.error(f"KRYTYCZNY BŁĄD IMPORTU: Upewnij się, że pliki vorteza_stack.py, vorteza_flow.py i vorteza_base.py znajdują się w głównym folderze. Szczegóły: {e}")
+    st.error(f"KRYTYCZNY BŁĄD IMPORTU: Upewnij się, że pliki vorteza_stack.py, vorteza_flow.py i vorteza_base.py znajdują się w głównym folderze. Szczegóły: {e}") [cite: 34]
 
 # --- 2. KONFIGURACJA APEX ULTIMATE PLUS ---
 st.set_page_config(
-    page_title="VORTEZA APEX SYSTEMS v24.0",
+    page_title="VORTEZA APEX SYSTEMS v24.2",
     layout="wide",
     initial_sidebar_state="expanded",
     page_icon="🕋"
-)
+) [cite: 1, 34]
 
-# --- 3. DYNAMICZNY SILNIK STATYSTYK (LIVE DATA) ---
+# Funkcja pomocnicza do Base64 dla grafik (tło, ikony, logo)
+def get_base64_image(image_path):
+    if os.path.exists(image_path):
+        try:
+            with open(image_path, "rb") as img_file:
+                return base64.b64encode(img_file.read()).decode() [cite: 2]
+        except: return ""
+    return ""
+
+# --- 3. PEŁNY SILNIK STATYSTYK (LOGIKA Z TWOJEGO ZAPASU) ---
 def get_dashboard_stats():
-    """Pobiera realne dane z Google Sheets i lokalnych JSONów dla Dashboardu."""
+    """Pobiera realne dane z Google Sheets i lokalnych JSONów dla Dashboardu.""" [cite: 35]
     stats = {"vehicles": 0, "alerts": 0, "euro": 0.0, "skus": 0}
     
-    # Dane z Google Sheets (BASE)
+    # Dane z Google Sheets (BASE) [cite: 36]
     try:
         creds = Credentials.from_service_account_info(
             st.secrets["GCP_SERVICE_ACCOUNT"],
-            scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+            scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"] [cite: 3]
         )
         client = gspread.authorize(creds)
-        sheet = client.open_by_key("1JV-vXpwAbvvboQd7eijashVmS3kkOqTf_LJrbrsWSxo").sheet1
+        sheet = client.open_by_key("1JV-vXpwAbvvboQd7eijashVmS3kkOqTf_LJrbrsWSxo").sheet1 [cite: 36]
         df_base = pd.DataFrame(sheet.get_all_records())
         if not df_base.empty:
-            stats["vehicles"] = len(df_base['Numer Rejestracyjny'].unique())
-            stats["alerts"] = len(df_base[df_base['Wynik Kontroli'].astype(str).str.contains("ALERT", na=False)])
+            stats["vehicles"] = len(df_base['Numer Rejestracyjny'].unique()) [cite: 36]
+            stats["alerts"] = len(df_base[df_base['Wynik Kontroli'].astype(str).str.contains("ALERT", na=False)]) [cite: 36]
     except: pass
 
-    # Dane z lokalnych plików JSON (FLOW i STACK)
+    # Dane z lokalnych plików JSON (FLOW i STACK) [cite: 37]
     try:
         if os.path.exists("data/config.json"):
             with open("data/config.json", "r", encoding="utf-8") as f:
-                stats["euro"] = json.load(f).get("EURO_RATE", 0.0)
+                stats["euro"] = json.load(f).get("EURO_RATE", 0.0) [cite: 37]
         
         if os.path.exists("data/products.json"):
             with open("data/products.json", "r", encoding="utf-8") as f:
-                stats["skus"] = len(json.load(f))
+                stats["skus"] = len(json.load(f)) [cite: 37]
     except: pass
     
     return stats
 
-# --- 4. SILNIK WIZUALNY VORTEZA ---
+# --- 4. SILNIK WIZUALNY VORTEZA (DESIGN CARBON & COPPER) ---
 def inject_hub_theme():
-    st.markdown("""
+    bg_img = get_base64_image(os.path.join("assets", "tlo_hub_2.jpg"))
+    st.markdown(f"""
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&family=JetBrains+Mono&display=swap');
-            :root { --v-copper: #B58863; --v-dark: #060606; }
-            .stApp { background-color: var(--v-dark); color: #FFFFFF; font-family: 'Montserrat', sans-serif; }
-            section[data-testid="stSidebar"] { background-color: #030303 !important; border-right: 1px solid rgba(181, 136, 99, 0.3); width: 350px !important; }
-            .v-status-glow { color: #00FF41; text-shadow: 0 0 10px #00FF41; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
-            h1, h2, h3 { color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 6px !important; font-weight: 700 !important; }
-            .stButton>button { background-color: transparent !important; color: var(--v-copper) !important; border: 1px solid var(--v-copper) !important; width: 100%; transition: 0.4s; }
-            .stButton>button:hover { background-color: var(--v-copper) !important; color: black !important; }
+            @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&family=JetBrains+Mono&display=swap'); [cite: 5, 38]
+            :root {{ --v-copper: #B58863; --v-dark: #060606; }} [cite: 6, 39]
+            
+            /* Tło główne aplikacji */
+            .stApp {{ 
+                background-image: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url("data:image/jpg;base64,{bg_img}");
+                background-size: cover; background-attachment: fixed; color: #FFFFFF; font-family: 'Montserrat', sans-serif; [cite: 7, 40]
+            }}
+            
+            /* Stabilny pasek boczny */
+            section[data-testid="stSidebar"] {{ 
+                background-color: #030303 !important; 
+                border-right: 2px solid var(--v-copper) !important; 
+                min-width: 320px !important; [cite: 8, 41]
+            }}
+            
+            /* Kolor miedziany dla tekstów nawigacji */
+            [data-testid="stSidebarNav"] span, [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] label p {{
+                color: var(--v-copper) !important; font-weight: 600 !important; [cite: 9]
+            }}
+
+            h1, h2, h3 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 4px !important; font-weight: 700 !important; text-align: center; [cite: 10, 45] }}
+            
+            /* INTERAKTYWNE KARTY DASHBOARDU */
+            .module-container {{ position: relative; text-align: center; margin-bottom: 25px; }} [cite: 13]
+            .module-card {{
+                background: rgba(10, 10, 10, 0.9); border: 2px solid var(--v-copper); border-radius: 15px;
+                padding: 45px 10px; transition: 0.4s; height: 290px; display: flex; flex-direction: column; justify-content: center; align-items: center; [cite: 12]
+            }}
+            .module-container:hover .module-card {{
+                background: rgba(181, 136, 99, 0.25); transform: translateY(-8px); box-shadow: 0 15px 35px rgba(181, 136, 99, 0.5); [cite: 14]
+            }}
+            .module-card img {{ width: 130px; margin-bottom: 20px; filter: drop-shadow(0 0 10px rgba(181, 136, 99, 0.5)); [cite: 15, 16] }}
+            .module-card h3 {{ margin: 0; font-size: 1.8rem !important; letter-spacing: 5px !important; }}
+
+            /* Nakładka przycisku na całą ramkę kafelka */
+            .stButton button {{
+                position: absolute; top: 0; left: 0; width: 100%; height: 290px;
+                background: transparent !important; border: none !important; color: transparent !important; z-index: 10; cursor: pointer; [cite: 17, 18]
+            }}
+            
+            [data-testid="stMetricValue"] {{ color: var(--v-copper) !important; [cite: 19] }}
+            .v-status-glow {{ color: #00FF41; text-shadow: 0 0 10px #00FF41; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; [cite: 20, 43] }}
         </style>
     """, unsafe_allow_html=True)
 
@@ -73,77 +119,117 @@ def inject_hub_theme():
 def main_hub():
     inject_hub_theme()
     
-    # --- INICJALIZACJA SESJI ---
+    # Inicjalizacja stanów sesji (Z wersji zapasowej)
     if "global_auth" not in st.session_state: 
-        st.session_state.global_auth = False
+        st.session_state.global_auth = False [cite: 21, 48]
     if "username" not in st.session_state: 
-        st.session_state.username = "UNAUTHORIZED"
+        st.session_state.username = "UNAUTHORIZED" [cite: 21, 48]
+    if "app_mode" not in st.session_state:
+        st.session_state.app_mode = "PULPIT (DASHBOARD)" [cite: 21]
 
-    # --- EKRAN LOGOWANIA Z VIDEO ---
+    # --- EKRAN LOGOWANIA ---
     if not st.session_state.global_auth:
-        _, col, _ = st.columns([0.8, 2, 0.8])
+        _, col, _ = st.columns([0.8, 2, 0.8]) [cite: 22, 49]
         with col:
-            # Implementacja video promocyjnego
+            logo_b64 = get_base64_image(os.path.join("assets", "logo_vorteza.jpg"))
+            if logo_b64: st.markdown(f'<p style="text-align:center;"><img src="data:image/jpg;base64,{logo_b64}" width="280"></p>', unsafe_allow_html=True) [cite: 22]
+            
             video_path = os.path.join("assets", "video 1.mp4")
             if os.path.exists(video_path):
-                st.video(video_path, autoplay=True, muted=True, loop=True)
-            else:
-                st.markdown("<br><br>", unsafe_allow_html=True)
+                st.video(video_path, autoplay=True, muted=True, loop=True) [cite: 23, 49]
+            else: st.markdown("<br><br>", unsafe_allow_html=True) [cite: 50]
             
-            st.markdown("<h1 style='text-align:center;'>VORTEZA LOGIN</h1>", unsafe_allow_html=True)
-            with st.form("ApexAuth"):
-                pwd_input = st.text_input("GOLIATH SECURITY KEY", type="password")
-                if st.form_submit_button("VALIDATE ACCESS"):
-                    if pwd_input == st.secrets["password"]:
-                        st.session_state.global_auth = True
-                        st.session_state.username = st.secrets["USERS"].get("admin", "NeonParrot821")
-                        st.rerun()
-                    else: st.error("ACCESS DENIED: INVALID KEY")
+            st.markdown("<h1 style='text-align:center;'>VORTEZA LOGIN</h1>", unsafe_allow_html=True) [cite: 50]
+            with st.form("ApexAuth"): [cite: 23, 50]
+                pwd_input = st.text_input("GOLIATH SECURITY KEY", type="password") [cite: 23, 50]
+                if st.form_submit_button("VALIDATE ACCESS"): [cite: 24, 50]
+                    if pwd_input == st.secrets["password"]: [cite: 24, 51]
+                        st.session_state.global_auth = True [cite: 24, 51]
+                        st.session_state.username = st.secrets["USERS"].get("admin", "NeonParrot821") [cite: 24, 51]
+                        st.rerun() [cite: 25, 51]
+                    else: st.error("ACCESS DENIED: INVALID KEY") [cite: 52]
         return
 
-    # --- PASEK BOCZNY (NAWIGACJA) ---
+    # --- PASEK BOCZNY (SIDEBAR) ---
     with st.sidebar:
-        st.markdown("<h2 style='letter-spacing:10px;'>VORTEZA</h2>", unsafe_allow_html=True)
-        st.markdown("<span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span>", unsafe_allow_html=True)
-        st.divider()
-        app_mode = st.radio("MODUŁY SYSTEMOWE", ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"])
-        st.divider()
-        st.markdown(f"**OPERATOR:** {st.session_state.username}")
-        st.markdown(f"**CZAS:** {datetime.now().strftime('%H:%M:%S')}")
-        if st.button("TERMINATE SESSION"):
-            st.session_state.global_auth = False
-            st.session_state.username = "UNAUTHORIZED"
-            st.rerun()
+        logo_side_b64 = get_base64_image(os.path.join("assets", "logo_vorteza.jpg"))
+        if logo_side_b64:
+            st.markdown(f'<p style="text-align:center; margin-bottom: -15px;"><img src="data:image/jpg;base64,{logo_side_b64}" style="width: 100%; max-width: 250px;"></p>', unsafe_allow_html=True) [cite: 25]
+        
+        st.markdown("<h2 style='text-align:center; margin-top: 0;'>VORTEZA</h2>", unsafe_allow_html=True) [cite: 26, 52]
+        st.markdown("<p style='text-align:center;'><span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span></p>", unsafe_allow_html=True) [cite: 52]
+        st.divider() [cite: 26, 52]
+        
+        # Nawigacja - używamy key="app_mode" by spiąć radio bezpośrednio z sesją. 
+        # To gwarantuje, że interakcje w STACK nie zresetują wybranego modułu.
+        modes = ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"] [cite: 26, 52]
+        st.radio("NAWIGACJA SYSTEMOWA", modes, key="app_mode") [cite: 26, 52]
+        
+        st.divider() [cite: 27, 52]
+        st.markdown(f"**OPERATOR:** {st.session_state.username}") [cite: 27, 52]
+        st.markdown(f"**DATA:** {datetime.now().strftime('%d/%m/%Y')}") [cite: 27, 53]
+        if st.button("TERMINATE SESSION"): [cite: 27, 53]
+            st.session_state.global_auth = False [cite: 27, 53]
+            st.rerun() [cite: 27, 53]
 
-    # --- ROUTING (PRZEŁĄCZANIE MODUŁÓW) ---
-    if app_mode == "PULPIT (DASHBOARD)":
-        st.markdown("<h1>MISSION CONTROL</h1>", unsafe_allow_html=True)
-        st.markdown("---")
-        with st.spinner("Pobieranie statusu operacyjnego..."):
-            s = get_dashboard_stats()
+    # --- ROUTING (WYŚWIETLANIE MODUŁÓW) ---
+    mode = st.session_state.app_mode [cite: 28]
+
+    if mode == "PULPIT (DASHBOARD)":
+        banner_path = os.path.join("assets", "baner 1.jpg") [cite: 28]
+        if os.path.exists(banner_path):
+            _, mid_col, _ = st.columns([1, 1.8, 1]) [cite: 28]
+            with mid_col: st.image(banner_path, use_column_width=True) [cite: 28]
+            
+        st.markdown("<h1 style='text-align:center;'>MISSION CONTROL</h1>", unsafe_allow_html=True) [cite: 28, 53]
+        st.markdown("---") [cite: 28, 53]
         
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("POJAZDY W SYSTEMIE", s["vehicles"])
+        with st.spinner("Pobieranie parametrów operacyjnych..."): [cite: 28, 54]
+            s = get_dashboard_stats() [cite: 28, 54]
         
-        # Logika kolorowania alertów
-        a_color = "inverse" if s["alerts"] > 0 else "normal"
-        c2.metric("AKTYWNE ALERTY", s["alerts"], delta=s["alerts"], delta_color=a_color)
+        c1, c2, c3, c4 = st.columns(4) [cite: 29, 54]
+        c1.metric("POJAZDY W SYSTEMIE", s["vehicles"]) [cite: 29, 54]
+        a_color = "inverse" if s["alerts"] > 0 else "normal" [cite: 54]
+        c2.metric("AKTYWNE ALERTY", s["alerts"], delta=s["alerts"], delta_color=a_color) [cite: 29, 54]
+        c3.metric("KURS EURO (V)", f"{s['euro']} PLN") [cite: 29, 55]
+        c4.metric("BAZA SKU", s["skus"]) [cite: 29, 55]
+
+        st.markdown("<br><br>", unsafe_allow_html=True) [cite: 29, 55]
         
-        c3.metric("KURS EURO (V)", f"{s['euro']} PLN")
-        c4.metric("BAZA SKU", s["skus"])
-        
-        st.markdown("<br>", unsafe_allow_html=True)
+        # SIATKA KLIKALNYCH MODUŁÓW Z IKONAMI
+        m1, m2, m3 = st.columns(3) [cite: 30]
+        i_stack = get_base64_image(os.path.join("assets", "icon_stack.png"))
+        i_flow = get_base64_image(os.path.join("assets", "icon_flow.png"))
+        i_base = get_base64_image(os.path.join("assets", "icon_base.png"))
+
+        with m1:
+            st.markdown(f"<div class='module-container'><div class='module-card'><img src='data:image/png;base64,{i_stack}'><h3>STACK</h3></div></div>", unsafe_allow_html=True) [cite: 30]
+            if st.button(" ", key="btn_stack"):
+                st.session_state.app_mode = "PLANER 3D (STACK)" [cite: 30]
+                st.rerun() [cite: 31]
+        with m2:
+            st.markdown(f"<div class='module-container'><div class='module-card'><img src='data:image/png;base64,{i_flow}'><h3>FLOW</h3></div></div>", unsafe_allow_html=True) [cite: 31]
+            if st.button(" ", key="btn_flow"):
+                st.session_state.app_mode = "FINANSE (FLOW)" [cite: 31]
+                st.rerun() [cite: 31]
+        with m3:
+            st.markdown(f"<div class='module-container'><div class='module-card'><img src='data:image/png;base64,{i_base}'><h3>BASE</h3></div></div>", unsafe_allow_html=True) [cite: 32]
+            if st.button(" ", key="btn_base"):
+                st.session_state.app_mode = "FLOTA (BASE)" [cite: 32]
+                st.rerun() [cite: 32]
+
         if s["alerts"] > 0:
-            st.error(f"UWAGA: Wykryto {s['alerts']} usterki w module BASE. Wymagana weryfikacja.")
+            st.error(f"UWAGA: Wykryto {s['alerts']} usterki w module BASE. Wymagana weryfikacja.") [cite: 55, 56]
         else:
-            st.success("Status floty: NOMINALNY. Wszystkie systemy sprawne.")
+            st.success("Status floty: NOMINALNY. Wszystkie systemy sprawne.") [cite: 56]
 
-    elif app_mode == "PLANER 3D (STACK)": 
-        run_stack()
-    elif app_mode == "FINANSE (FLOW)": 
-        run_flow()
-    elif app_mode == "FLOTA (BASE)": 
-        run_base()
+    # --- URUCHAMIANIE MODUŁÓW (TWOJA LOGIKA BIZNESOWA) ---
+    elif mode == "PLANER 3D (STACK)": 
+        run_stack() [cite: 32, 56]
+    elif mode == "FINANSE (FLOW)": 
+        run_flow() [cite: 33, 56]
+    elif mode == "FLOTA (BASE)": 
+        run_base() [cite: 33, 56]
 
 if __name__ == "__main__":
     main_hub()
