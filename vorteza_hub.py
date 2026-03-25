@@ -13,7 +13,7 @@ try:
     from vorteza_flow import run_flow
     from vorteza_base import run_base
 except ImportError as e:
-    st.error(f"BŁĄD IMPORTU: {e}")
+    st.error(f"KRYTYCZNY BŁĄD IMPORTU: {e}")
 
 # --- 2. KONFIGURACJA APEX ULTIMATE PLUS ---
 st.set_page_config(
@@ -23,7 +23,7 @@ st.set_page_config(
     page_icon="🕋"
 )
 
-# Funkcja pomocnicza do Base64 - GWARANTUJE WYŚWIETLANIE LOGA
+# Funkcja do Base64 dla stabilnych grafik
 def get_base64_image(image_path):
     if os.path.exists(image_path):
         try:
@@ -34,7 +34,6 @@ def get_base64_image(image_path):
 
 # --- 3. DYNAMICZNY SILNIK STATYSTYK (TWOJA LOGIKA Z ZAPASU) ---
 def get_dashboard_stats():
-    """Pobiera realne dane z Google Sheets i lokalnych JSONów."""
     stats = {"vehicles": 0, "alerts": 0, "euro": 0.0, "skus": 0}
     try:
         creds = Credentials.from_service_account_info(
@@ -58,27 +57,44 @@ def get_dashboard_stats():
     except: pass
     return stats
 
-# --- 4. SILNIK WIZUALNY VORTEZA ---
+# --- 4. SILNIK WIZUALNY VORTEZA (FIX DLA NAPISÓW PIONOWYCH) ---
 def inject_hub_theme():
     bg_img = get_base64_image(os.path.join("assets", "tlo_hub_2.jpg"))
     st.markdown(f"""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&display=swap');
             :root {{ --v-copper: #B58863; --v-dark: #060606; }}
+            
             .stApp {{ 
                 background-image: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url("data:image/jpg;base64,{bg_img}");
                 background-size: cover; background-attachment: fixed; color: #FFFFFF; font-family: 'Montserrat', sans-serif; 
             }}
+            
+            /* POPRAWKA PASKA BOCZNEGO */
             section[data-testid="stSidebar"] {{ 
                 background-color: #030303 !important; 
-                border-right: 2px solid var(--v-copper) !important; 
-                width: 350px !important;
+                border-right: 2px solid var(--v-copper);
+                min-width: 300px !important;
             }}
-            /* Kolor miedziany dla tekstów nawigacji */
-            [data-testid="stSidebar"] * {{ color: var(--v-copper) !important; font-weight: 600 !important; }}
             
-            h1, h2, h3 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 6px !important; font-weight: 700 !important; text-align: center; }}
+            /* Fix dla nakładających się i pionowych napisów  */
+            [data-testid="stSidebar"] .stRadio label p {{
+                color: var(--v-copper) !important;
+                font-weight: 600 !important;
+                font-size: 1.1rem !important;
+                line-height: 1.5 !important;
+                display: block !important;
+                white-space: normal !important;
+            }}
             
+            /* Odstępy między opcjami w menu [cite: 13] */
+            [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {{
+                gap: 15px !important;
+            }}
+
+            h1, h2, h3 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 4px !important; font-weight: 700 !important; text-align: center; }}
+            
+            /* DESIGN KAFELKÓW DASHBOARDU */
             .module-card {{
                 background: rgba(10, 10, 10, 0.9); border: 2px solid var(--v-copper); border-radius: 15px;
                 padding: 40px 10px; height: 280px; display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -87,10 +103,12 @@ def inject_hub_theme():
             .module-card:hover {{ background: rgba(181, 136, 99, 0.2); transform: translateY(-5px); box-shadow: 0 10px 30px rgba(181, 136, 99, 0.4); }}
             .module-card img {{ width: 120px; margin-bottom: 20px; }}
             
+            /* Klikalna powierzchnia kafelka */
             .stButton button {{
                 position: absolute; top: 0; left: 0; width: 100%; height: 280px;
                 background: transparent !important; border: none !important; color: transparent !important; z-index: 10; cursor: pointer;
             }}
+            
             [data-testid="stMetricValue"] {{ color: var(--v-copper) !important; }}
             .v-status-glow {{ color: #00FF41; text-shadow: 0 0 10px #00FF41; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }}
         </style>
@@ -102,11 +120,11 @@ def main_hub():
     
     if "global_auth" not in st.session_state: st.session_state.global_auth = False
     
-    # Inicjalizacja stanu rano - TO NAPRAWIA STACK
+    # Inicjalizacja stanu dla STACK
     if "app_mode" not in st.session_state:
         st.session_state.app_mode = "PULPIT (DASHBOARD)"
 
-    # --- EKRAN LOGOWANIA ---
+    # --- LOGOWANIE ---
     if not st.session_state.global_auth:
         _, col, _ = st.columns([0.8, 2, 0.8])
         with col:
@@ -118,42 +136,37 @@ def main_hub():
                 if st.form_submit_button("VALIDATE ACCESS"):
                     if pwd_input == st.secrets["password"]:
                         st.session_state.global_auth = True
-                        st.session_state.username = st.secrets["USERS"].get("admin", "NeonParrot821")
+                        st.session_state.username = st.secrets["USERS"].get("admin", "GOLIATH-OPERATOR")
                         st.rerun()
                     else: st.error("ACCESS DENIED")
         return
 
-    # --- PASEK BOCZNY (NAPRAWIONY) ---
+    # --- PASEK BOCZNY ---
     with st.sidebar:
-        # Logo w Base64 - ZAWSZE SIĘ WYŚWIETLI
         logo_side_b64 = get_base64_image(os.path.join("assets", "logo_vorteza.jpg"))
         if logo_side_b64:
-            st.markdown(f'<p style="text-align:center;"><img src="data:image/jpg;base64,{logo_side_b64}" width="250"></p>', unsafe_allow_html=True)
-        else:
-            st.markdown("<h2 style='letter-spacing:10px;'>VORTEZA</h2>", unsafe_allow_html=True)
+            st.markdown(f'<div style="text-align: center; margin-bottom: 20px;"><img src="data:image/jpg;base64,{logo_side_b64}" width="220"></div>', unsafe_allow_html=True)
             
-        st.markdown("<p style='text-align:center;'><span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span></p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center;'><span class='v-status-glow'>● SYSTEM ONLINE</span></p>", unsafe_allow_html=True)
         st.divider()
         
-        # Przywrócenie Twoich oryginalnych nazw modułów
         modes = ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"]
         
-        # Synchronizacja stanu sesji z radiem
-        st.radio(
+        # Nawigacja radiowa - spięta z app_mode 
+        st.session_state.app_mode = st.radio(
             "MODUŁY SYSTEMOWE", 
             modes, 
-            index=modes.index(st.session_state.app_mode),
-            key="app_mode" 
+            index=modes.index(st.session_state.app_mode)
         )
         
         st.divider()
-        st.markdown(f"**OPERATOR:** {st.session_state.get('username', 'GOLIATH-01')}")
+        st.markdown(f"**OPERATOR:** {st.session_state.get('username', 'OPERATOR')}")
         st.markdown(f"**CZAS:** {datetime.now().strftime('%H:%M:%S')}")
         if st.button("TERMINATE SESSION"):
             st.session_state.global_auth = False
             st.rerun()
 
-    # --- ROUTING (KORZYSTA Z SESSION_STATE) ---
+    # --- ROUTING ---
     mode = st.session_state.app_mode
 
     if mode == "PULPIT (DASHBOARD)":
@@ -170,26 +183,32 @@ def main_hub():
         c4.metric("BAZA SKU", s["skus"])
 
         st.markdown("<br>", unsafe_allow_html=True)
-        m1, m2, m3 = st.columns(3)
         
-        # Kafelki sterujące sesją
+        m1, m2, m3 = st.columns(3)
+        i_stack = get_base64_image(os.path.join("assets", "icon_stack.png"))
+        i_flow = get_base64_image(os.path.join("assets", "icon_flow.png"))
+        i_base = get_base64_image(os.path.join("assets", "icon_base.png"))
+
         with m1:
-            st.markdown(f"<div class='module-card'><img src='data:image/png;base64,{get_base64_image(os.path.join('assets', 'icon_stack.png'))}'><h3>STACK</h3></div>", unsafe_allow_html=True)
-            if st.button(" ", key="btn_stk"):
+            st.markdown(f"<div class='module-card'><img src='data:image/png;base64,{i_stack}'><h3>STACK</h3></div>", unsafe_allow_html=True)
+            if st.button(" ", key="btn_stack"):
                 st.session_state.app_mode = "PLANER 3D (STACK)"
                 st.rerun()
         with m2:
-            st.markdown(f"<div class='module-card'><img src='data:image/png;base64,{get_base64_image(os.path.join('assets', 'icon_flow.png'))}'><h3>FLOW</h3></div>", unsafe_allow_html=True)
-            if st.button(" ", key="btn_flw"):
+            st.markdown(f"<div class='module-card'><img src='data:image/png;base64,{i_flow}'><h3>FLOW</h3></div>", unsafe_allow_html=True)
+            if st.button(" ", key="btn_flow"):
                 st.session_state.app_mode = "FINANSE (FLOW)"
                 st.rerun()
         with m3:
-            st.markdown(f"<div class='module-card'><img src='data:image/png;base64,{get_base64_image(os.path.join('assets', 'icon_base.png'))}'><h3>BASE</h3></div>", unsafe_allow_html=True)
-            if st.button(" ", key="btn_bas"):
+            st.markdown(f"<div class='module-card'><img src='data:image/png;base64,{i_base}'><h3>BASE</h3></div>", unsafe_allow_html=True)
+            if st.button(" ", key="btn_base"):
                 st.session_state.app_mode = "FLOTA (BASE)"
                 st.rerun()
 
-    # WYWOŁANIE TWOICH SILNIKÓW
+        if s["alerts"] > 0:
+            st.error(f"UWAGA: Wykryto {s['alerts']} usterki w module BASE.")
+        else: st.success("Status floty: NOMINALNY.")
+
     elif mode == "PLANER 3D (STACK)": run_stack()
     elif mode == "FINANSE (FLOW)": run_flow()
     elif mode == "FLOTA (BASE)": run_base()
