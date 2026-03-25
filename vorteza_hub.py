@@ -62,8 +62,9 @@ def get_dashboard_stats():
 
 # --- 4. SILNIK WIZUALNY VORTEZA ---
 def inject_hub_theme():
-    # Pobieranie tła w base64
-    bg_img = get_base64_image("tlo_hub_2.jpg")
+    # Pobieranie tła z folderu assets
+    bg_path = os.path.join("assets", "tlo_hub_2.jpg")
+    bg_img = get_base64_image(bg_path)
     bg_style = ""
     if bg_img:
         bg_style = f"""
@@ -102,7 +103,6 @@ def inject_hub_theme():
             }}
             .stButton>button:hover {{ background-color: var(--v-copper) !important; color: black !important; }}
             
-            /* Stylizacja formularza logowania */
             [data-testid="stForm"] {{
                 background-color: rgba(0, 0, 0, 0.8);
                 border: 1px solid var(--v-copper);
@@ -121,19 +121,20 @@ def main_hub():
     if "username" not in st.session_state: 
         st.session_state.username = "UNAUTHORIZED"
 
-    # --- EKRAN LOGOWANIA Z VIDEO (SINGLE PLAY) ---
+    # --- EKRAN LOGOWANIA Z VIDEO ---
     if not st.session_state.global_auth:
         _, col, _ = st.columns([0.8, 2, 0.8])
         with col:
             st.markdown("<br><br>", unsafe_allow_html=True)
-            # Wyświetlanie Logo na ekranie logowania
-            if os.path.exists("logo_vorteza.jpg"):
-                st.image("logo_vorteza.jpg", width=250)
+            
+            # Logo z folderu assets
+            logo_path = os.path.join("assets", "logo_vorteza.jpg")
+            if os.path.exists(logo_path):
+                st.image(logo_path, width=250)
 
-            # Implementacja video promocyjnego - Loop ustawiony na False
+            # Video z folderu assets
             video_path = os.path.join("assets", "video 1.mp4")
             if os.path.exists(video_path):
-                # Video odtwarza się tylko raz (loop=False)
                 st.video(video_path, autoplay=True, muted=True, loop=False)
             
             st.markdown("<h1 style='text-align:center;'>VORTEZA LOGIN</h1>", unsafe_allow_html=True)
@@ -149,9 +150,9 @@ def main_hub():
 
     # --- PASEK BOCZNY (NAWIGACJA) ---
     with st.sidebar:
-        # Integracja Logo w pasku bocznym
-        if os.path.exists("logo_vorteza.jpg"):
-            st.image("logo_vorteza.jpg", use_column_width=True)
+        logo_path = os.path.join("assets", "logo_vorteza.jpg")
+        if os.path.exists(logo_path):
+            st.image(logo_path, use_column_width=True)
         
         st.markdown("<h2 style='letter-spacing:10px; text-align:center;'>VORTEZA</h2>", unsafe_allow_html=True)
         st.markdown("<p style='text-align:center;'><span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span></p>", unsafe_allow_html=True)
@@ -167,9 +168,10 @@ def main_hub():
 
     # --- ROUTING (PRZEŁĄCZANIE MODUŁÓW) ---
     if app_mode == "PULPIT (DASHBOARD)":
-        # Integracja Baner 1 jako nagłówek Dashboardu
-        if os.path.exists("baner 1.jpg"):
-            st.image("baner 1.jpg", use_column_width=True)
+        # Baner z folderu assets
+        banner_path = os.path.join("assets", "baner 1.jpg")
+        if os.path.exists(banner_path):
+            st.image(banner_path, use_column_width=True)
             
         st.markdown("<h1>MISSION CONTROL</h1>", unsafe_allow_html=True)
         st.markdown("---")
