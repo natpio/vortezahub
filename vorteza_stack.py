@@ -37,11 +37,12 @@ LANGUAGES = {
 
 # REJESTR POJAZDÓW (Uporządkowany od najmniejszego do największego)
 FLEET_MASTER_DATA = {
-    "BUS Opel Movano": {"max_w": 1300, "L": 420, "W": 210, "H": 190, "axles": 2, "cab_l": 150, "total_ldm": 4.2},
-    "Solo 6m Light": {"max_w": 5000, "L": 610, "W": 245, "H": 240, "axles": 2, "cab_l": 180, "total_ldm": 6.1},
-    "Solo 7m Medium": {"max_w": 7000, "L": 720, "W": 245, "H": 240, "axles": 2, "cab_l": 180, "total_ldm": 7.2},
-    "Solo 9m Heavy Duty": {"max_w": 9500, "L": 920, "W": 245, "H": 240, "axles": 2, "cab_l": 200, "total_ldm": 9.2},
-    "TIR FTL Standard 13.6m": {"max_w": 24000, "L": 1360, "W": 248, "H": 240, "axles": 3, "cab_l": 250, "total_ldm": 13.6}
+    "BUS Opel Movano": {"max_w": 1300, "L": 420, "W": 210, "H": 230, "axles": 2, "cab_l": 150, "total_ldm": 4.2},
+    "Solo 6m Light": {"max_w": 5000, "L": 610, "W": 245, "H": 250, "axles": 2, "cab_l": 180, "total_ldm": 6.1},
+    "Solo 7m Medium": {"max_w": 7000, "L": 720, "W": 245, "H": 260, "axles": 2, "cab_l": 180, "total_ldm": 7.2},
+    "Solo 9m Heavy Duty": {"max_w": 9500, "L": 920, "W": 245, "H": 270, "axles": 2, "cab_l": 200, "total_ldm": 9.2},
+    "TIR FTL Standard 13.6m": {"max_w": 24000, "L": 1360, "W": 248, "H": 275, "axles": 3, "cab_l": 250, "total_ldm": 13.6},
+    "TIR FTL Mega 13.6m": {"max_w": 24000, "L": 1360, "W": 248, "H": 300, "axles": 3, "cab_l": 250, "total_ldm": 13.6}
 }
 
 # ==============================================================================
@@ -257,10 +258,13 @@ def run_stack():
             
             veh_idx = 0
             if len(planned_fleet) > 1:
-                # MIEDZIANY RADIO BUTTON DLA WYBORU POJAZDU
                 veh_idx = st.radio(L['select_veh'], range(len(planned_fleet)), format_func=lambda x: f"{L['vehicle_num']}{x+1} - {planned_fleet[x]['v_name']}", horizontal=True)
             
             active_veh = planned_fleet[veh_idx]
+            
+            # --- ZAPISZ WYBRANY POJAZD DLA MODUŁU FLOW ---
+            st.session_state.stack_selected_veh = active_veh['v_name']
+            
             ldm_occ = (max([s['x'] + s['w'] for s in active_veh['stacks']]) / 100) if active_veh['stacks'] else 0
             
             c1, c2, c3, c4, c5 = st.columns(5)
