@@ -5,6 +5,7 @@ import os
 import json
 import math
 import base64
+import re
 
 # ==============================================================================
 # 0. ZASOBY I KONFIGURACJA (STRUKTURA GITHUB)
@@ -115,12 +116,10 @@ def show_financial_analysis():
         st.divider()
         
         # --- INTEGRACJA Z CORE ---
-        # Odczytujemy punkt startu i celu z sesji (jeśli weszliśmy z CORE)
         core_orig = st.session_state.get("flow_origin", "")
         core_dest = st.session_state.get("flow_dest", "")
         
         origins_list = list(CONF["DISTANCES_AND_MYTO"].keys())
-        # Bezpieczne ustawienie indeksu (jesli CORE podał miasto z bazy)
         idx_orig = origins_list.index(core_orig) if core_orig in origins_list else 0
         origin = st.selectbox("PUNKT STARTU", origins_list, index=idx_orig)
         
@@ -128,15 +127,34 @@ def show_financial_analysis():
         idx_dest = dests_list.index(core_dest) if core_dest in dests_list else 0
         dest = st.selectbox("PUNKT DOCELOWY", dests_list, index=idx_dest)
         
-        # Pobranie kursu EURO z config.json
         eur_rate = st.number_input("KURS EUR/PLN", value=CONF.get("EURO_RATE", 4.30), step=0.01)
         
         st.divider()
         st.markdown("### 📈 MODEL PRZYCHODU TRASY")
+        
+        # --- PARSOWANIE STAWKI Z CORE (SMART DEFAULT) ---
+        core_rate_raw = str(st.session_state.get("flow_rate", ""))
+        core_rate_val = 0.0
+        core_rate_curr = "PLN"
+        
+        if core_rate_raw:
+            if "EUR" in core_rate_raw.upper() or "€" in core_rate_raw:
+                core_rate_curr = "EUR"
+            try:
+                match = re.search(r'\d+([.,]\d+)?', core_rate_raw.replace(' ', ''))
+                if match:
+                    core_rate_val = float(match.group(0).replace(',', '.'))
+            except: pass
+
+        default_model_idx = 1 if core_rate_val > 0 else 0 # 1 to RYCZAŁT
+        default_curr_idx = 1 if core_rate_curr == "EUR" else 0
+        
         c_cols = st.columns([2, 1])
-        with c_cols[0]: rate_type = st.selectbox("MODEL", ["KM", "RYCZAŁT", "OPAKOWANIE"])
-        with c_cols[1]: rate_curr = st.selectbox("WALUTA", ["PLN", "EUR"], key="rate_curr")
-        rate_val = st.number_input(f"STAWKA ({rate_curr})", value=6.50 if rate_curr == "PLN" else 1.50)
+        with c_cols[0]: rate_type = st.selectbox("MODEL", ["KM", "RYCZAŁT", "OPAKOWANIE"], index=default_model_idx)
+        with c_cols[1]: rate_curr = st.selectbox("WALUTA", ["PLN", "EUR"], key="rate_curr", index=default_curr_idx)
+        
+        default_rate_val = core_rate_val if core_rate_val > 0 else (6.50 if rate_curr == "PLN" else 1.50)
+        rate_val = st.number_input(f"STAWKA ({rate_curr})", value=float(default_rate_val))
         
         st.divider()
         st.markdown("### 🏟️ TRYB TARGOWY (EXPO)")
