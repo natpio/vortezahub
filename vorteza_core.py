@@ -30,7 +30,7 @@ def load_local_json(path):
     except: return {}
 
 # ==============================================================================
-# 2. GOOGLE SHEETS ENGINE (Dla zakładki "Zlecenia")
+# 2. GOOGLE SHEETS ENGINE
 # ==============================================================================
 def get_gspread_client():
     creds_info = st.secrets["GCP_SERVICE_ACCOUNT"]
@@ -85,6 +85,25 @@ def update_order_billing(order_id, inv_num, inv_date, term_days, is_paid):
         return False
     except: return False
 
+def update_full_order(order_id, klient, start, koniec, data_z, data_r, postoj, stawka, sprzet_json, uwagi):
+    try:
+        client = get_gspread_client()
+        sheet = client.open_by_key(SHEET_ID).worksheet("Zlecenia")
+        records = sheet.get_all_records()
+        for i, row in enumerate(records):
+            if str(row.get('ID')) == str(order_id):
+                row_idx = i + 2
+                cell_list = sheet.range(f'C{row_idx}:L{row_idx}')
+                values = [str(klient), str(row.get('Opiekun', '')), str(start), str(koniec), str(data_z), str(data_r), int(postoj), str(stawka), str(sprzet_json), str(uwagi)]
+                for j, val in enumerate(values):
+                    cell_list[j].value = val
+                sheet.update_cells(cell_list)
+                return True
+        return False
+    except Exception as e: 
+        st.error(f"Błąd zapisu bazy: {e}")
+        return False
+
 # ==============================================================================
 # 3. INTERFEJS I MOTYW VORTEZA
 # ==============================================================================
@@ -122,9 +141,9 @@ def inject_core_theme():
             
             div[data-testid="stButton"] button {{ width: 100%; border-color: #B58863 !important; color: #B58863 !important; background: transparent !important; margin-bottom: 5px; }}
             div[data-testid="stButton"] button:hover {{ background: #B58863 !important; color: #000 !important; }}
-            
-            /* Przycisk zapisu w formularzu billingowym */
             .billing-btn div[data-testid="stButton"] button {{ background: rgba(181, 136, 99, 0.2) !important; }}
+            .btn-danger div[data-testid="stButton"] button {{ color: #FF4B4B !important; border-color: #FF4B4B !important; padding: 0px !important; margin: 0px !important; }}
+            .btn-danger div[data-testid="stButton"] button:hover {{ background: #FF4B4B !important; color: white !important; }}
         </style>
     """, unsafe_allow_html=True)
 
@@ -140,13 +159,15 @@ def run_core():
     products_data = load_local_json(PATH_PRODUCTS)
     
     if "core_cart" not in st.session_state: st.session_state.core_cart = []
+    if "edit_cart" not in st.session_state: st.session_state.edit_cart = []
+    if "current_edit_id" not in st.session_state: st.session_state.current_edit_id = ""
 
     with st.sidebar:
         st.markdown("### 🎛️ PANEL STEROWANIA")
-        # --- DODANO CZWARTY TRYB: ROZLICZENIA ---
         mode = st.radio("TRYB PRACY:", [
             "📊 TABLICA ZLECEŃ (KANBAN)", 
             "➕ NOWE ZLECENIE", 
+            "✏️ EDYCJA ZLECENIA",
             "💰 ROZLICZENIA (BILLING)",
             "🗄️ BAZA / ARCHIWUM"
         ], label_visibility="collapsed")
@@ -301,7 +322,6 @@ def run_core():
                 order_id = f"VC-{now.strftime('%y')}-{now.strftime('%H%M%S')}"
                 sprzet_json = json.dumps(st.session_state.core_cart, ensure_ascii=False)
                 
-                # Zapisuje puste wartości dla rozliczeń przy tworzeniu nowego zlecenia
                 row = [
                     order_id, "DRAFT (NOWE)", klient, current_user, start, koniec, 
                     str(data_z), str(data_r), postoj, stawka, sprzet_json, uwagi,
@@ -313,35 +333,130 @@ def run_core():
                     st.success(f"Zlecenie {order_id} zostało pomyślnie utworzone!")
                     st.balloons()
                 else:
-                    st.error("Błąd zapisu. Upewnij się, że masz 16 kolumn w Google Sheets (dodaj: Faktura, DataFaktury, TerminDni, StatusPlatnosci).")
+                    st.error("Błąd zapisu w Google Sheets.")
 
     # --------------------------------------------------------------------------
-    # WIDOK 3: ROZLICZENIA (BILLING)
+    # WIDOK 3: EDYCJA ZLECENIA (NOWOŚĆ!)
+    # --------------------------------------------------------------------------
+    elif mode == "✏️ EDYCJA ZLECENIA":
+        st.markdown("### ✏️ EDYTOR ZLECENIA")
+        if df.empty:
+            st.info("Brak zleceń w systemie.")
+        else:
+            # Edytujemy tylko zlecenia aktywne (nie zamknięte ani nie anulowane)
+            aktywne_df = df[df['Status'].isin(['DRAFT (NOWE)', 'ZAAKCEPTOWANE', 'W TRASIE'])]
+            if aktywne_df.empty:
+                st.success("Brak aktywnych zleceń do edycji.")
+            else:
+                lista_zlecen = aktywne_df['ID'].astype(str) + " | " + aktywne_df['Klient'].astype(str)
+                wybrane_zlecenie_str = st.selectbox("WYBIERZ ZLECENIE DO EDYCJI", lista_zlecen.tolist())
+                
+                wybrane_id = wybrane_zlecenie_str.split(" | ")[0]
+                row_data = aktywne_df[aktywne_df['ID'].astype(str) == wybrane_id].iloc[0]
+                
+                # Pobieranie ładunku do stanu sesji tylko przy zmianie wybranego zlecenia
+                if st.session_state.get('current_edit_id') != wybrane_id:
+                    st.session_state.current_edit_id = wybrane_id
+                    try:
+                        st.session_state.edit_cart = json.loads(row_data.get('Sprzet', '[]'))
+                    except:
+                        st.session_state.edit_cart = []
+                
+                c_left, c_right = st.columns([2, 1])
+                
+                with c_left:
+                    with st.container(border=True):
+                        st.markdown("#### 1. LOGISTYKA")
+                        col1, col2 = st.columns(2)
+                        klient = col1.text_input("KLIENT / ZLECENIODAWCA", value=str(row_data.get('Klient', '')))
+                        stawka = col2.text_input("STAWKA", value=str(row_data.get('Stawka', '')))
+                        
+                        miasta_start = list(config_data.get("DISTANCES_AND_MYTO", {}).keys()) if config_data else ["Poznań", "Warszawa"]
+                        start_val = str(row_data.get('Start', ''))
+                        idx_start = miasta_start.index(start_val) if start_val in miasta_start else 0
+                        
+                        col3, col4 = st.columns(2)
+                        start = col3.selectbox("MIEJSCE ZAŁADUNKU", miasta_start, index=idx_start, key="ed_start")
+                        
+                        miasta_cel = list(config_data.get("DISTANCES_AND_MYTO", {}).get(start, {}).keys()) if config_data else []
+                        koniec_val = str(row_data.get('Koniec', ''))
+                        idx_koniec = miasta_cel.index(koniec_val) if koniec_val in miasta_cel else 0
+                        koniec = col4.selectbox("MIEJSCE ROZŁADUNKU", miasta_cel, index=idx_koniec, key="ed_koniec")
+                        
+                        col5, col6, col7 = st.columns(3)
+                        try: dz_obj = datetime.strptime(str(row_data.get('DataZal', '')), "%Y-%m-%d").date()
+                        except: dz_obj = datetime.now().date()
+                        try: dr_obj = datetime.strptime(str(row_data.get('DataRozl', '')), "%Y-%m-%d").date()
+                        except: dr_obj = datetime.now().date()
+                        
+                        data_z = col5.date_input("DATA ZAŁADUNKU", value=dz_obj, key="ed_dz")
+                        data_r = col6.date_input("DATA ROZŁADUNKU", value=dr_obj, key="ed_dr")
+                        try: postoj_val = int(row_data.get('Postoj', 0))
+                        except: postoj_val = 0
+                        postoj = col7.number_input("DNI POSTOJU (EXPO)", min_value=0, value=postoj_val, key="ed_postoj")
+                        
+                        uwagi = st.text_area("UWAGI OPERACYJNE", value=str(row_data.get('Uwagi', '')), key="ed_uwagi")
+
+                with c_right:
+                    with st.container(border=True):
+                        st.markdown("#### 2. ŁADUNEK (SKU)")
+                        lista_sku = [p['name'] for p in products_data] if products_data else []
+                        wybrane_sku = st.selectbox("WYBIERZ SPRZĘT", lista_sku, key="ed_sku")
+                        ilosc_sku = st.number_input("ILOŚĆ (SZTUKI/CASE)", min_value=1, value=1, key="ed_ilosc")
+                        
+                        if st.button("➕ DODAJ DO ŁADUNKU", key="ed_dodaj"):
+                            st.session_state.edit_cart.append({"SKU": wybrane_sku, "ILOSC": ilosc_sku})
+                            st.rerun()
+                        
+                        st.markdown("---")
+                        if st.session_state.edit_cart:
+                            for i, item in enumerate(st.session_state.edit_cart):
+                                col_a, col_b = st.columns([4, 1])
+                                col_a.markdown(f"- **{item['ILOSC']}x** {item['SKU']}")
+                                st.markdown("<div class='btn-danger'>", unsafe_allow_html=True)
+                                if col_b.button("❌", key=f"del_ed_{i}"):
+                                    st.session_state.edit_cart.pop(i)
+                                    st.rerun()
+                                st.markdown("</div>", unsafe_allow_html=True)
+                            
+                            if st.button("🗑️ WYCZYŚĆ WSZYSTKO", key="ed_clear"):
+                                st.session_state.edit_cart = []
+                                st.rerun()
+                        else:
+                            st.info("Brak sprzętu.")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("💾 NADPISZ I ZAPISZ ZMIANY", use_container_width=True, key="ed_save"):
+                    if not klient:
+                        st.error("Podaj nazwę klienta!")
+                    else:
+                        sprzet_json = json.dumps(st.session_state.edit_cart, ensure_ascii=False)
+                        if update_full_order(wybrane_id, klient, start, koniec, data_z, data_r, postoj, stawka, sprzet_json, uwagi):
+                            st.success(f"Zlecenie {wybrane_id} zostało pomyślnie zaktualizowane!")
+                            st.balloons()
+                        else:
+                            st.error("Błąd zapisu danych. Spróbuj ponownie.")
+
+    # --------------------------------------------------------------------------
+    # WIDOK 4: ROZLICZENIA (BILLING)
     # --------------------------------------------------------------------------
     elif mode == "💰 ROZLICZENIA (BILLING)":
         st.markdown("### 💰 PANEL ROZLICZEŃ I WINDYKACJI")
-        st.write("Wprowadzaj faktury do zleceń, które zjechały na bazę i kontroluj terminy płatności.")
         st.markdown("---")
         
         if df.empty:
             st.info("Brak zleceń w systemie.")
         else:
-            # Filtrujemy zlecenia Zakończone oraz Zarchiwizowane
             df_billing = df[df['Status'].isin(['ZAKOŃCZONE', 'ZAMKNIĘTE'])]
-            
             if df_billing.empty:
                 st.success("Brak zakończonych zleceń do rozliczenia.")
             else:
                 for _, row in df_billing.iterrows():
                     o_id = row.get('ID', 'N/A')
-                    
-                    # Odczytywanie zapisanych danych faktury
                     inv_no = str(row.get('Faktura', '')).strip()
                     inv_date_str = str(row.get('DataFaktury', '')).strip()
-                    
                     try: term_days = int(row.get('TerminDni', 14))
                     except: term_days = 14
-                        
                     is_paid_str = str(row.get('StatusPlatnosci', 'NIE')).strip().upper()
                     is_paid = (is_paid_str == 'TAK')
                     
@@ -366,7 +481,6 @@ def run_core():
                     else:
                         badge_html = "<span style='color:#AAAAAA; font-size: 1.1rem;'>⏳ BRAK FAKTURY</span>"
                     
-                    # Rysowanie kafelka rozliczeniowego
                     st.markdown(f"""
                         <div class="billing-card">
                             <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
@@ -381,32 +495,28 @@ def run_core():
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    # Formularz aktualizacji faktury
                     with st.form(f"bill_form_{o_id}"):
                         c1, c2, c3, c4, c5 = st.columns([2, 2, 1, 1, 1.5])
-                        
                         new_inv_no = c1.text_input("NUMER FAKTURY", value=inv_no, key=f"inv_{o_id}")
-                        
                         try: default_date = datetime.strptime(inv_date_str, "%Y-%m-%d").date() if inv_date_str else datetime.now().date()
                         except: default_date = datetime.now().date()
-                        
                         new_inv_date = c2.date_input("DATA WYSTAWIENIA", value=default_date, key=f"date_{o_id}")
                         new_term = c3.number_input("TERMIN (DNI)", value=term_days, step=1, key=f"term_{o_id}")
                         new_is_paid = c4.checkbox("✅ OPŁACONA", value=is_paid, key=f"paid_{o_id}")
                         
                         st.markdown("<div class='billing-btn'>", unsafe_allow_html=True)
-                        submitted = c5.form_submit_button("💾 ZAPISZ DANE")
+                        submitted = c5.form_submit_button("💾 ZAPISZ / AKTUALIZUJ")
                         st.markdown("</div>", unsafe_allow_html=True)
                         
                         if submitted:
                             status_val = "TAK" if new_is_paid else "NIE"
                             if update_order_billing(o_id, new_inv_no, new_inv_date.strftime("%Y-%m-%d"), new_term, status_val):
-                                st.success("Zapisano dane faktury!"); st.rerun()
+                                st.success("Dane faktury zostały zaktualizowane!"); st.rerun()
                             else:
                                 st.error("Błąd zapisu. Upewnij się, że masz dodane kolumny M, N, O, P w arkuszu.")
 
     # --------------------------------------------------------------------------
-    # WIDOK 4: BAZA / ARCHIWUM
+    # WIDOK 5: BAZA / ARCHIWUM
     # --------------------------------------------------------------------------
     elif mode == "🗄️ BAZA / ARCHIWUM":
         st.markdown("### 🗄️ REJESTR WSZYSTKICH ZLECEŃ")
