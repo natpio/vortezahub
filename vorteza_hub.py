@@ -23,7 +23,7 @@ st.set_page_config(
     page_icon="🕋"
 )
 
-# --- FUNKCJA POMOCNICZA DLA TŁA B64 ---
+# --- FUNKCJA POMOCNICZA DLA TŁA I IKON B64 ---
 def get_base64_of_bin_file(bin_file):
     try:
         if os.path.exists(bin_file):
@@ -95,7 +95,7 @@ def inject_hub_theme():
             .stButton>button {{ background-color: rgba(10,10,10,0.8) !important; color: var(--v-copper) !important; border: 1px solid var(--v-copper) !important; width: 100%; transition: 0.4s; }}
             .stButton>button:hover {{ background-color: var(--v-copper) !important; color: black !important; }}
             
-            /* Kafelki modułów */
+            /* Kafelki modułów - dodano margines dolny oddzielający przycisk */
             .module-card {{ 
                 background: rgba(10, 10, 10, 0.75); 
                 border: 1px solid rgba(181, 136, 99, 0.4); 
@@ -104,6 +104,7 @@ def inject_hub_theme():
                 border-radius: 8px; 
                 text-align: center; 
                 backdrop-filter: blur(5px); 
+                margin-bottom: 15px;
             }}
             
             /* Poprawa czytelności metryk (liczb na pulpicie) */
@@ -126,7 +127,7 @@ def inject_hub_theme():
 
 # --- CALLBACK NAWIGACYJNY ---
 def navigate_to(page_name):
-    """Bezpieczna funkcja aktualizująca stan sesji dla nawigacji (bez konfliktu z widgetami)."""
+    """Bezpieczna funkcja aktualizująca stan sesji dla nawigacji."""
     st.session_state.active_module = page_name
 
 # --- 5. GŁÓWNA LOGIKA HUB-A ---
@@ -240,43 +241,46 @@ def main_hub():
         
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # --- ZARZĄDZANIE MODUŁAMI (KAFELKI NAWIGACYJNE) ---
+        # --- ZARZĄDZANIE MODUŁAMI (KAFELKI W PEŁNI HTML) ---
         m1, m2, m3 = st.columns(3)
         
         with m1:
-            st.markdown("<div class='module-card'>", unsafe_allow_html=True)
-            _, icon_col, _ = st.columns([1, 1.5, 1])
-            with icon_col:
-                icon_path_stack = os.path.join("assets", "icon_stack.png")
-                if os.path.exists(icon_path_stack):
-                    st.image(icon_path_stack, use_container_width=True)
-            st.markdown("<h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>PLANER 3D</h4>", unsafe_allow_html=True)
-            st.button("URUCHOM STACK", key="btn_go_stack", on_click=navigate_to, args=("PLANER 3D (STACK)",))
-            st.markdown("</div>", unsafe_allow_html=True)
+            icon_b64 = get_base64_of_bin_file(os.path.join("assets", "icon_stack.png"))
+            img_html = f"<img src='data:image/png;base64,{icon_b64}' style='width: 45%; max-width: 150px; display: block; margin: 0 auto;'/>" if icon_b64 else ""
+            
+            st.markdown(f"""
+                <div class='module-card'>
+                    {img_html}
+                    <h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>PLANER 3D</h4>
+                </div>
+            """, unsafe_allow_html=True)
+            st.button("URUCHOM STACK", key="btn_go_stack", on_click=navigate_to, args=("PLANER 3D (STACK)",), use_container_width=True)
 
         with m2:
-            st.markdown("<div class='module-card'>", unsafe_allow_html=True)
-            _, icon_col, _ = st.columns([1, 1.5, 1])
-            with icon_col:
-                icon_path_flow = os.path.join("assets", "icon_flow.png")
-                if os.path.exists(icon_path_flow):
-                    st.image(icon_path_flow, use_container_width=True)
-            st.markdown("<h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>FINANSE</h4>", unsafe_allow_html=True)
-            st.button("URUCHOM FLOW", key="btn_go_flow", on_click=navigate_to, args=("FINANSE (FLOW)",))
-            st.markdown("</div>", unsafe_allow_html=True)
+            icon_b64 = get_base64_of_bin_file(os.path.join("assets", "icon_flow.png"))
+            img_html = f"<img src='data:image/png;base64,{icon_b64}' style='width: 45%; max-width: 150px; display: block; margin: 0 auto;'/>" if icon_b64 else ""
+            
+            st.markdown(f"""
+                <div class='module-card'>
+                    {img_html}
+                    <h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>FINANSE</h4>
+                </div>
+            """, unsafe_allow_html=True)
+            st.button("URUCHOM FLOW", key="btn_go_flow", on_click=navigate_to, args=("FINANSE (FLOW)",), use_container_width=True)
             
         with m3:
-            st.markdown("<div class='module-card'>", unsafe_allow_html=True)
-            _, icon_col, _ = st.columns([1, 1.5, 1])
-            with icon_col:
-                icon_path_base = os.path.join("assets", "icon_base.png")
-                if os.path.exists(icon_path_base):
-                    st.image(icon_path_base, use_container_width=True)
-            st.markdown("<h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>FLOTA</h4>", unsafe_allow_html=True)
-            st.button("URUCHOM BASE", key="btn_go_base", on_click=navigate_to, args=("FLOTA (BASE)",))
-            st.markdown("</div>", unsafe_allow_html=True)
+            icon_b64 = get_base64_of_bin_file(os.path.join("assets", "icon_base.png"))
+            img_html = f"<img src='data:image/png;base64,{icon_b64}' style='width: 45%; max-width: 150px; display: block; margin: 0 auto;'/>" if icon_b64 else ""
             
-            # KOMUNIKAT ALERTU PRZENIESIONY POD KAFELEK FLOTY
+            st.markdown(f"""
+                <div class='module-card'>
+                    {img_html}
+                    <h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>FLOTA</h4>
+                </div>
+            """, unsafe_allow_html=True)
+            st.button("URUCHOM BASE", key="btn_go_base", on_click=navigate_to, args=("FLOTA (BASE)",), use_container_width=True)
+            
+            # KOMUNIKAT ALERTU 
             st.markdown("<br>", unsafe_allow_html=True)
             if s["alerts"] > 0:
                 st.error(f"UWAGA: Wykryto {s['alerts']} usterki. Wymagana weryfikacja.")
