@@ -95,6 +95,7 @@ def inject_hub_theme():
             .stButton>button {{ background-color: rgba(10,10,10,0.8) !important; color: var(--v-copper) !important; border: 1px solid var(--v-copper) !important; width: 100%; transition: 0.4s; }}
             .stButton>button:hover {{ background-color: var(--v-copper) !important; color: black !important; }}
             
+            /* Kafelki modułów */
             .module-card {{ 
                 background: rgba(10, 10, 10, 0.75); 
                 border: 1px solid rgba(181, 136, 99, 0.4); 
@@ -103,6 +104,22 @@ def inject_hub_theme():
                 border-radius: 8px; 
                 text-align: center; 
                 backdrop-filter: blur(5px); 
+            }}
+            
+            /* Poprawa czytelności metryk (liczb na pulpicie) */
+            [data-testid="stMetricLabel"] p {{
+                color: var(--v-copper) !important;
+                font-weight: 700 !important;
+                letter-spacing: 1px !important;
+                text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+            }}
+            [data-testid="stMetricValue"] div {{
+                color: #FFFFFF !important;
+                font-family: 'JetBrains Mono', monospace !important;
+                text-shadow: 2px 2px 5px rgba(0,0,0,0.9);
+            }}
+            [data-testid="stMetricDelta"] div {{
+                text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
             }}
         </style>
     """, unsafe_allow_html=True)
@@ -122,7 +139,6 @@ def main_hub():
     if "username" not in st.session_state: 
         st.session_state.username = "UNAUTHORIZED"
         
-    # NOWA, BEZPIECZNA ZMIENNA NAWIGACYJNA
     if "active_module" not in st.session_state:
         st.session_state.active_module = "PULPIT (DASHBOARD)"
 
@@ -158,7 +174,6 @@ def main_hub():
     else:
         # --- PASEK BOCZNY TYLKO DLA MODUŁÓW (Z LOGO I IKONAMI) ---
         with st.sidebar:
-            # Logo
             logo_path = os.path.join("assets", "logo_vorteza.png")
             if os.path.exists(logo_path):
                 st.image(logo_path, use_container_width=True)
@@ -168,11 +183,9 @@ def main_hub():
             st.markdown("<div style='text-align:center;'><span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span></div>", unsafe_allow_html=True)
             st.divider()
             
-            # Przycisk powrotu na Dashboard
             st.button("🏠 PULPIT (DASHBOARD)", key="sb_nav_dash", on_click=navigate_to, args=("PULPIT (DASHBOARD)",), use_container_width=True)
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # Nawigacja do STACK
             c1, c2 = st.columns([1, 4])
             with c1:
                 icon_path_stack = os.path.join("assets", "icon_stack.png")
@@ -180,7 +193,6 @@ def main_hub():
             with c2:
                 st.button("PLANER 3D (STACK)", key="sb_nav_stack", on_click=navigate_to, args=("PLANER 3D (STACK)",), use_container_width=True)
             
-            # Nawigacja do FLOW
             c1, c2 = st.columns([1, 4])
             with c1:
                 icon_path_flow = os.path.join("assets", "icon_flow.png")
@@ -188,7 +200,6 @@ def main_hub():
             with c2:
                 st.button("FINANSE (FLOW)", key="sb_nav_flow", on_click=navigate_to, args=("FINANSE (FLOW)",), use_container_width=True)
             
-            # Nawigacja do BASE
             c1, c2 = st.columns([1, 4])
             with c1:
                 icon_path_base = os.path.join("assets", "icon_base.png")
@@ -227,15 +238,9 @@ def main_hub():
         c3.metric("KURS EURO (V)", f"{s['euro']} PLN")
         c4.metric("BAZA SKU", s["skus"])
         
-        st.markdown("<br>", unsafe_allow_html=True)
-        if s["alerts"] > 0:
-            st.error(f"UWAGA: Wykryto {s['alerts']} usterki w module BASE. Wymagana weryfikacja.")
-        else:
-            st.success("Status floty: NOMINALNY. Wszystkie systemy sprawne.")
-
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # --- ZARZĄDZANIE MODUŁAMI (KAFELKI NAWIGACYJNE Z CALLBACKAMI) ---
+        # --- ZARZĄDZANIE MODUŁAMI (KAFELKI NAWIGACYJNE) ---
         m1, m2, m3 = st.columns(3)
         
         with m1:
@@ -270,6 +275,13 @@ def main_hub():
             st.markdown("<h4 style='text-align:center; font-size: 1.1rem; margin-top: 15px;'>FLOTA</h4>", unsafe_allow_html=True)
             st.button("URUCHOM BASE", key="btn_go_base", on_click=navigate_to, args=("FLOTA (BASE)",))
             st.markdown("</div>", unsafe_allow_html=True)
+            
+            # KOMUNIKAT ALERTU PRZENIESIONY POD KAFELEK FLOTY
+            st.markdown("<br>", unsafe_allow_html=True)
+            if s["alerts"] > 0:
+                st.error(f"UWAGA: Wykryto {s['alerts']} usterki. Wymagana weryfikacja.")
+            else:
+                st.success("Status: NOMINALNY. System sprawny.")
 
     # --- WŁAŚCIWE WYWOŁANIA MODUŁÓW ---
     elif st.session_state.active_module == "PLANER 3D (STACK)": 
