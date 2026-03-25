@@ -163,7 +163,6 @@ def run_core():
                         with a2:
                             if st.button("📦 STACK", key=f"stk_{o_id}"):
                                 try:
-                                    # Pobieranie JSONa z arkusza i budowanie V_MANIFEST
                                     order_items = json.loads(row.get('Sprzet', '[]'))
                                     new_manifest = []
                                     for item in order_items:
@@ -174,7 +173,6 @@ def run_core():
                                                 new_manifest.append(p_copy)
                                                 break
                                     
-                                    # Nadpisanie sesji i skok do modułu STACK
                                     st.session_state.v_manifest = new_manifest
                                     st.session_state.active_module = "PLANER 3D (STACK)"
                                     st.rerun()
@@ -189,12 +187,28 @@ def run_core():
                                 st.rerun()
                         with a2:
                             if st.button("💸 FLOW", key=f"flw_{o_id}"):
-                                # Przekazanie trasy I STAWKI do FLOW
-                                st.session_state.flow_origin = row.get('Start', '')
-                                st.session_state.flow_dest = row.get('Koniec', '')
-                                st.session_state.flow_rate = row.get('Stawka', '')
-                                st.session_state.active_module = "FINANSE (FLOW)"
-                                st.rerun()
+                                try:
+                                    # BUDUJEMY MANIFEST DLA FLOW (Rozwiązanie błędu "BRAK DANYCH W STACK")
+                                    order_items = json.loads(row.get('Sprzet', '[]'))
+                                    new_manifest = []
+                                    for item in order_items:
+                                        for p in products_data:
+                                            if p['name'] == item['SKU']:
+                                                p_copy = p.copy()
+                                                p_copy['p_act'] = int(item['ILOSC'])
+                                                new_manifest.append(p_copy)
+                                                break
+                                    
+                                    st.session_state.v_manifest = new_manifest
+                                    
+                                    # Przekazanie trasy I STAWKI do FLOW
+                                    st.session_state.flow_origin = row.get('Start', '')
+                                    st.session_state.flow_dest = row.get('Koniec', '')
+                                    st.session_state.flow_rate = row.get('Stawka', '')
+                                    st.session_state.active_module = "FINANSE (FLOW)"
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Błąd ładunku przy otwieraniu FLOW: {e}")
                             
                     elif title == "W TRASIE":
                         with a1:
