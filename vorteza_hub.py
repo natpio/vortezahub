@@ -13,7 +13,7 @@ try:
     from vorteza_flow import run_flow
     from vorteza_base import run_base
 except ImportError as e:
-    st.error(f"KRYTYCZNY BŁĄD IMPORTU: Upewnij się, że pliki vorteza_stack.py, vorteza_flow.py i vorteza_base.py znajdują się w głównym folderze. Szczegóły: {e}")
+    st.error(f"KRYTYCZNY BŁĄD IMPORTU: {e}")
 
 # --- 2. KONFIGURACJA APEX ULTIMATE PLUS ---
 st.set_page_config(
@@ -23,14 +23,16 @@ st.set_page_config(
     page_icon="🕋"
 )
 
-# Funkcja do Base64 dla grafik interfejsu
+# Funkcja pomocnicza do Base64
 def get_base64_image(image_path):
     if os.path.exists(image_path):
-        with open(image_path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode()
+        try:
+            with open(image_path, "rb") as img_file:
+                return base64.b64encode(img_file.read()).decode()
+        except: return ""
     return ""
 
-# --- 3. DYNAMICZNY SILNIK STATYSTYK (TWOJA PEŁNA LOGIKA) ---
+# --- 3. DYNAMICZNY SILNIK STATYSTYK (TWOJA LOGIKA BIZNESOWA) ---
 def get_dashboard_stats():
     stats = {"vehicles": 0, "alerts": 0, "euro": 0.0, "skus": 0}
     try:
@@ -66,30 +68,29 @@ def inject_hub_theme():
                 background-image: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url("data:image/jpg;base64,{bg_img}");
                 background-size: cover; background-attachment: fixed; color: #FFFFFF; font-family: 'Montserrat', sans-serif; 
             }}
-            section[data-testid="stSidebar"] {{ 
-                background-color: rgba(3, 3, 3, 0.98) !important; 
-                border-right: 2px solid var(--v-copper); 
-            }}
+            section[data-testid="stSidebar"] {{ background-color: rgba(3, 3, 3, 0.98) !important; border-right: 2px solid var(--v-copper); }}
             [data-testid="stSidebarNav"] span, [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] label {{
                 color: var(--v-copper) !important; font-weight: 600 !important;
             }}
             h1, h2, h3 {{ color: var(--v-copper) !important; text-transform: uppercase; letter-spacing: 4px !important; font-weight: 700 !important; text-align: center; }}
             
-            /* Kafelki na Dashboardzie */
+            /* KARTY DASHBOARDU */
             .module-container {{ position: relative; text-align: center; margin-bottom: 25px; }}
             .module-card {{
                 background: rgba(10, 10, 10, 0.9); border: 2px solid var(--v-copper); border-radius: 15px;
-                padding: 40px 10px; transition: 0.4s; height: 280px; display: flex; flex-direction: column; justify-content: center; align-items: center;
+                padding: 45px 10px; transition: 0.4s; height: 280px; display: flex; flex-direction: column; justify-content: center; align-items: center;
             }}
-            .module-container:hover .module-card {{ background: rgba(181, 136, 99, 0.2); transform: translateY(-5px); box-shadow: 0 10px 30px rgba(181, 136, 99, 0.4); }}
-            .module-card img {{ width: 120px; margin-bottom: 20px; }}
-            .module-card h3 {{ margin: 0; font-size: 1.8rem !important; }}
+            .module-container:hover .module-card {{ background: rgba(181, 136, 99, 0.25); transform: translateY(-5px); box-shadow: 0 15px 35px rgba(181, 136, 99, 0.5); }}
+            .module-card img {{ width: 130px; margin-bottom: 20px; filter: drop-shadow(0 0 10px rgba(181, 136, 99, 0.5)); }}
+            .module-card h3 {{ margin: 0; font-size: 1.8rem !important; letter-spacing: 5px !important; }}
 
-            /* Ukryty przycisk na kafelku */
+            /* Przezroczysty przycisk na całą ramkę */
             .stButton button {{
                 position: absolute; top: 0; left: 0; width: 100%; height: 280px;
-                background: transparent !important; border: none !important; color: transparent !important; z-index: 10; cursor: pointer;
+                background: transparent !important; border: none !important; color: transparent !important;
+                z-index: 10; cursor: pointer;
             }}
+            
             [data-testid="stMetricValue"] {{ color: var(--v-copper) !important; }}
             [data-testid="stMetricLabel"] {{ color: #FFFFFF !important; }}
             .v-status-glow {{ color: #00FF41; text-shadow: 0 0 10px #00FF41; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }}
@@ -100,11 +101,13 @@ def inject_hub_theme():
 def main_hub():
     inject_hub_theme()
     
-    # Inicjalizacja sesji dokładnie jak rano
-    if "global_auth" not in st.session_state: 
-        st.session_state.global_auth = False
-    if "username" not in st.session_state: 
-        st.session_state.username = "UNAUTHORIZED"
+    # Inicjalizacja sesji (Kluczowe dla STACK!)
+    if "global_auth" not in st.session_state: st.session_state.global_auth = False
+    if "username" not in st.session_state: st.session_state.username = "UNAUTHORIZED"
+    
+    # Inicjalizacja trybu aplikacji - IDENTYCZNIE jak w Twoim kodzie rano
+    if "app_mode" not in st.session_state:
+        st.session_state.app_mode = "PULPIT (DASHBOARD)"
 
     # --- EKRAN LOGOWANIA ---
     if not st.session_state.global_auth:
@@ -112,7 +115,6 @@ def main_hub():
         with col:
             logo_b64 = get_base64_image(os.path.join("assets", "logo_vorteza.jpg"))
             if logo_b64: st.markdown(f'<p style="text-align:center;"><img src="data:image/jpg;base64,{logo_b64}" width="280"></p>', unsafe_allow_html=True)
-            
             video_path = os.path.join("assets", "video 1.mp4")
             if os.path.exists(video_path): st.video(video_path, autoplay=True, muted=True, loop=False)
             
@@ -127,28 +129,30 @@ def main_hub():
                     else: st.error("ACCESS DENIED")
         return
 
-    # --- PASEK BOCZNY (TWOJA ORYGINALNA NAWIGACJA) ---
+    # --- PASEK BOCZNY ---
     with st.sidebar:
         logo_side_b64 = get_base64_image(os.path.join("assets", "logo_vorteza.jpg"))
         if logo_side_b64:
             st.markdown(f'<p style="text-align:center; margin-bottom: -15px;"><img src="data:image/jpg;base64,{logo_side_b64}" style="width: 100%; max-width: 250px;"></p>', unsafe_allow_html=True)
         
         st.markdown("<h2 style='text-align:center; margin-top: 0;'>VORTEZA</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center;'><span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span></p>", unsafe_allow_html=True)
-        st.divider()
+        st.markdown("<p style='text-align:center;'><span class='v-status-glow'>● SYSTEM ONLINE</span></p>", unsafe_allow_html=True)
         
-        # Przywrócenie identycznej listy i zmiennej app_mode
-        app_mode = st.radio("MODUŁY SYSTEMOWE", ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"])
+        # RADIO POWIĄZANE Z SESSION_STATE
+        options = ["PULPIT (DASHBOARD)", "PLANER 3D (STACK)", "FINANSE (FLOW)", "FLOTA (BASE)"]
+        
+        # To ustawia radio na podstawie tego, co kliknąłeś na Dashboardzie
+        st.session_state.app_mode = st.radio("NAWIGACJA", options, index=options.index(st.session_state.app_mode))
         
         st.divider()
         st.markdown(f"**OPERATOR:** {st.session_state.username}")
-        st.markdown(f"**CZAS:** {datetime.now().strftime('%H:%M:%S')}")
+        st.markdown(f"**DATA:** {datetime.now().strftime('%d/%m/%Y')}")
         if st.button("TERMINATE SESSION"):
             st.session_state.global_auth = False
             st.rerun()
 
-    # --- ROUTING (PULPIT / DASHBOARD) ---
-    if app_mode == "PULPIT (DASHBOARD)":
+    # --- ROUTING ---
+    if st.session_state.app_mode == "PULPIT (DASHBOARD)":
         banner_path = os.path.join("assets", "baner 1.jpg")
         if os.path.exists(banner_path):
             _, mid_col, _ = st.columns([1, 1.8, 1])
@@ -157,19 +161,18 @@ def main_hub():
         st.markdown("<h1 style='text-align:center;'>MISSION CONTROL</h1>", unsafe_allow_html=True)
         st.markdown("---")
         
-        with st.spinner("Pobieranie statusu operacyjnego..."):
+        with st.spinner("Pobieranie statusu..."):
             s = get_dashboard_stats()
         
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("POJAZDY W SYSTEMIE", s["vehicles"])
+        c1.metric("POJAZDY", s["vehicles"])
         a_color = "inverse" if s["alerts"] > 0 else "normal"
-        c2.metric("AKTYWNE ALERTY", s["alerts"], delta=s["alerts"], delta_color=a_color)
-        c3.metric("KURS EURO (V)", f"{s['euro']} PLN")
+        c2.metric("ALERTY", s["alerts"], delta=s["alerts"], delta_color=a_color)
+        c3.metric("KURS EUR", f"{s['euro']} PLN")
         c4.metric("BAZA SKU", s["skus"])
 
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # Kafelki sterujące radiem w sidebarze
         m1, m2, m3 = st.columns(3)
         i_stack = get_base64_image(os.path.join("assets", "icon_stack.png"))
         i_flow = get_base64_image(os.path.join("assets", "icon_flow.png"))
@@ -178,25 +181,25 @@ def main_hub():
         with m1:
             st.markdown(f"<div class='module-container'><div class='module-card'><img src='data:image/png;base64,{i_stack}'><h3>STACK</h3></div></div>", unsafe_allow_html=True)
             if st.button(" ", key="btn_stack"):
-                st.query_params["app_mode"] = "PLANER 3D (STACK)" # Używamy query_params by Streamlit "odświeżył" radio
+                st.session_state.app_mode = "PLANER 3D (STACK)"
                 st.rerun()
         with m2:
             st.markdown(f"<div class='module-container'><div class='module-card'><img src='data:image/png;base64,{i_flow}'><h3>FLOW</h3></div></div>", unsafe_allow_html=True)
             if st.button(" ", key="btn_flow"):
-                st.query_params["app_mode"] = "FINANSE (FLOW)"
+                st.session_state.app_mode = "FINANSE (FLOW)"
                 st.rerun()
         with m3:
             st.markdown(f"<div class='module-container'><div class='module-card'><img src='data:image/png;base64,{i_base}'><h3>BASE</h3></div></div>", unsafe_allow_html=True)
             if st.button(" ", key="btn_base"):
-                st.query_params["app_mode"] = "FLOTA (BASE)"
+                st.session_state.app_mode = "FLOTA (BASE)"
                 st.rerun()
 
-    # --- URUCHAMIANIE MODUŁÓW (TWOJE ORYGINALNE FUNKCJE) ---
-    elif app_mode == "PLANER 3D (STACK)":
+    # --- URUCHAMIANIE MODUŁÓW (Twoja oryginalna logika ranna) ---
+    elif st.session_state.app_mode == "PLANER 3D (STACK)":
         run_stack()
-    elif app_mode == "FINANSE (FLOW)":
+    elif st.session_state.app_mode == "FINANSE (FLOW)":
         run_flow()
-    elif app_mode == "FLOTA (BASE)":
+    elif st.session_state.app_mode == "FLOTA (BASE)":
         run_base()
 
 if __name__ == "__main__":
