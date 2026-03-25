@@ -184,7 +184,14 @@ def main_hub():
             st.markdown("<div style='text-align:center;'><span class='v-status-glow'>● SYSTEM STATUS: ONLINE</span></div>", unsafe_allow_html=True)
             st.divider()
             
-            st.button("🏠 PULPIT (DASHBOARD)", key="sb_nav_dash", on_click=navigate_to, args=("PULPIT (DASHBOARD)",), use_container_width=True)
+            # --- ZMIENIONY PRZYCISK DASHBOARD (home.jpg) ---
+            c1, c2 = st.columns([1, 4])
+            with c1:
+                icon_path_home = os.path.join("assets", "home.jpg")
+                if os.path.exists(icon_path_home): st.image(icon_path_home)
+            with c2:
+                st.button("PULPIT (DASHBOARD)", key="sb_nav_dash", on_click=navigate_to, args=("PULPIT (DASHBOARD)",), use_container_width=True)
+                
             st.markdown("<br>", unsafe_allow_html=True)
             
             c1, c2 = st.columns([1, 4])
