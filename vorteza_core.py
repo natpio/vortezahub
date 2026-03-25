@@ -99,7 +99,6 @@ def inject_core_theme():
             .status-trasa {{ border-left-color: #E67E22 !important; }}
             .status-koniec {{ border-left-color: #27AE60 !important; opacity: 0.6; }}
             
-            /* Stylizacja przycisków akcji na karcie */
             div[data-testid="stButton"] button {{ width: 100%; border-color: #B58863 !important; color: #B58863 !important; background: transparent !important; }}
             div[data-testid="stButton"] button:hover {{ background: #B58863 !important; color: #000 !important; }}
         </style>
@@ -116,7 +115,6 @@ def run_core():
     config_data = load_local_json(PATH_CONFIG)
     products_data = load_local_json(PATH_PRODUCTS)
     
-    # Inicjalizacja koszyka zamówienia
     if "core_cart" not in st.session_state: st.session_state.core_cart = []
 
     with st.sidebar:
@@ -131,20 +129,12 @@ def run_core():
             return
             
         c1, c2, c3, c4 = st.columns(4)
-        
-        # Definicje kolumn Kanban
-        columns = {
-            "DRAFT (NOWE)": c1,
-            "ZAAKCEPTOWANE": c2,
-            "W TRASIE": c3,
-            "ZAKOŃCZONE": c4
-        }
+        columns = {"DRAFT (NOWE)": c1, "ZAAKCEPTOWANE": c2, "W TRASIE": c3, "ZAKOŃCZONE": c4}
         
         for title, col in columns.items():
             with col:
                 st.markdown(f"<h4 style='text-align:center; font-size:1rem; border-bottom:1px solid #B58863; padding-bottom:10px;'>{title}</h4>", unsafe_allow_html=True)
                 
-                # Filtrowanie po statusie
                 df_filtered = df[df['Status'].astype(str) == title]
                 
                 for _, row in df_filtered.iterrows():
@@ -162,24 +152,48 @@ def run_core():
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    # Przyciski akcji (Zmień status / Zwaliduj)
                     a1, a2 = st.columns(2)
+                    
+                    # --- INTEGRACJA: DRAFT -> AKCEPT / STACK ---
                     if title == "DRAFT (NOWE)":
                         with a1:
                             if st.button("✅ AKCEPT", key=f"akc_{o_id}"):
                                 update_order_status(o_id, "ZAAKCEPTOWANE")
                                 st.rerun()
                         with a2:
-                            # Przycisk "wyślij do STACK" (na razie placeholder integracyjny)
-                            st.button("📦 STACK", key=f"stk_{o_id}")
-                            
+                            if st.button("📦 STACK", key=f"stk_{o_id}"):
+                                try:
+                                    # Pobieranie JSONa z arkusza i budowanie V_MANIFEST
+                                    order_items = json.loads(row.get('Sprzet', '[]'))
+                                    new_manifest = []
+                                    for item in order_items:
+                                        for p in products_data:
+                                            if p['name'] == item['SKU']:
+                                                p_copy = p.copy()
+                                                p_copy['p_act'] = int(item['ILOSC'])
+                                                new_manifest.append(p_copy)
+                                                break
+                                    
+                                    # Nadpisanie sesji i skok do modułu STACK
+                                    st.session_state.v_manifest = new_manifest
+                                    st.session_state.active_module = "PLANER 3D (STACK)"
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Błąd ładunku: {e}")
+                                    
+                    # --- INTEGRACJA: AKCEPT -> TRASA / FLOW ---
                     elif title == "ZAAKCEPTOWANE":
                         with a1:
                             if st.button("🚚 W DROGĘ", key=f"drg_{o_id}"):
                                 update_order_status(o_id, "W TRASIE")
                                 st.rerun()
                         with a2:
-                            st.button("💸 FLOW", key=f"flw_{o_id}")
+                            if st.button("💸 FLOW", key=f"flw_{o_id}"):
+                                # Przekazanie trasy do FLOW (zrobimy to w kolejnym kroku we flow.py)
+                                st.session_state.flow_origin = row.get('Start', '')
+                                st.session_state.flow_dest = row.get('Koniec', '')
+                                st.session_state.active_module = "FINANSE (FLOW)"
+                                st.rerun()
                             
                     elif title == "W TRASIE":
                         with a1:
@@ -199,7 +213,6 @@ def run_core():
                 klient = col1.text_input("KLIENT / ZLECENIODAWCA")
                 stawka = col2.text_input("STAWKA (np. 4500 PLN / 1200 EUR)")
                 
-                # Zaciąganie miast z config.json
                 miasta_start = list(config_data.get("DISTANCES_AND_MYTO", {}).keys()) if config_data else ["Poznań", "Warszawa"]
                 
                 col3, col4 = st.columns(2)
@@ -240,11 +253,8 @@ def run_core():
             if not klient:
                 st.error("Podaj nazwę klienta!")
             else:
-                # Generowanie ID: VC-26-XXXX
                 now = datetime.now()
                 order_id = f"VC-{now.strftime('%y')}-{now.strftime('%H%M%S')}"
-                
-                # Formatowanie sprzętu do JSON by zapisać w jednej komórce arkusza
                 sprzet_json = json.dumps(st.session_state.core_cart, ensure_ascii=False)
                 
                 row = [
@@ -253,7 +263,7 @@ def run_core():
                 ]
                 
                 if save_new_order(row):
-                    st.session_state.core_cart = [] # Czyścimy koszyk
+                    st.session_state.core_cart = [] 
                     st.success(f"Zlecenie {order_id} zostało pomyślnie utworzone!")
                     st.balloons()
                 else:
