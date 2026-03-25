@@ -41,8 +41,7 @@ FLEET_MASTER_DATA = {
     "Solo 6m Light": {"max_w": 5000, "L": 610, "W": 245, "H": 250, "axles": 2, "cab_l": 180, "total_ldm": 6.1},
     "Solo 7m Medium": {"max_w": 7000, "L": 720, "W": 245, "H": 260, "axles": 2, "cab_l": 180, "total_ldm": 7.2},
     "Solo 9m Heavy Duty": {"max_w": 9500, "L": 920, "W": 245, "H": 270, "axles": 2, "cab_l": 200, "total_ldm": 9.2},
-    "TIR FTL Standard 13.6m": {"max_w": 24000, "L": 1360, "W": 248, "H": 275, "axles": 3, "cab_l": 250, "total_ldm": 13.6},
-    "TIR FTL Mega 13.6m": {"max_w": 24000, "L": 1360, "W": 248, "H": 300, "axles": 3, "cab_l": 250, "total_ldm": 13.6}
+    "TIR FTL Standard 13.6m": {"max_w": 24000, "L": 1360, "W": 248, "H": 240, "axles": 3, "cab_l": 250, "total_ldm": 13.6}
 }
 
 # ==============================================================================
