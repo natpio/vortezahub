@@ -267,10 +267,21 @@ def run_stack():
             
             ldm_occ = (max([s['x'] + s['w'] for s in active_veh['stacks']]) / 100) if active_veh['stacks'] else 0
             
+            # --- NOWY KOD Z PRZELICZNIKIEM PALETOWYM ---
+            pal_factor = 2.5 if active_veh['v_spec']['W'] >= 240 else 2.0
+            pallet_spaces = round(ldm_occ * pal_factor, 1)
+            
             c1, c2, c3, c4, c5 = st.columns(5)
-            stats = [(L['pcs'], len(active_veh['packed_items'])), (L['weight'], f"{active_veh['weight']} KG"), (L['vol'], f"{active_veh['volume']:.1f} m³"), (L['ldm_occ'], f"{ldm_occ:.2f}"), (L['util'], f"{(active_veh['weight']/active_veh['v_spec']['max_w'])*100:.1f}%")]
+            stats = [
+                (L['pcs'], len(active_veh['packed_items'])), 
+                (L['weight'], f"{active_veh['weight']} KG"), 
+                ("MIEJSCA PAL.", f"{pallet_spaces} EUR"), 
+                (L['ldm_occ'], f"{ldm_occ:.2f}"), 
+                (L['util'], f"{(active_veh['weight']/active_veh['v_spec']['max_w'])*100:.1f}%")
+            ]
             for i, (label, val) in enumerate(stats):
                 with [c1, c2, c3, c4, c5][i]: st.markdown(f'<div class="v-kpi-card"><div class="v-kpi-label">{label}</div><div class="v-kpi-value">{val}</div></div>', unsafe_allow_html=True)
+            # -------------------------------------------
 
             st.plotly_chart(render_vorteza_pro_3d(active_veh['v_spec'], active_veh['stacks']), use_container_width=True)
             
